@@ -6,7 +6,8 @@ function Settings() {
   const [form, setForm] = useState({
     gemini_api_key: '',
     slack_bot_token: '',
-    slack_channel_id: ''
+    slack_channel_id: '',
+    autonomous_mode: false
   })
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState(null)
@@ -19,7 +20,12 @@ function Settings() {
     fetch(`${API_BASE}/api/settings`)
       .then((res) => res.json())
       .then((data) => {
-        setForm(data)
+        setForm({
+          gemini_api_key: data.gemini_api_key || '',
+          slack_bot_token: data.slack_bot_token || '',
+          slack_channel_id: data.slack_channel_id || '',
+          autonomous_mode: !!data.autonomous_mode
+        })
         setLoading(false)
       })
       .catch((err) => {
@@ -63,7 +69,7 @@ function Settings() {
 
       {message && (
         <div 
-          className="card" 
+         className="card" 
           style={{ 
             padding: '1rem', 
             marginBottom: '1.5rem',
@@ -153,6 +159,28 @@ function Settings() {
           />
           <p className="incident-time" style={{ marginTop: '0.2rem' }}>
             Channel where SRE alert cards will be posted.
+          </p>
+        </div>
+
+        <div className="form-group" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+          <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Shield size={16} color="var(--accent-cyan)" /> Autonomous Self-Healing Mode
+            </span>
+            <input 
+              type="checkbox"
+              style={{
+                width: '18px',
+                height: '18px',
+                accentColor: 'var(--accent-cyan)',
+                cursor: 'pointer'
+              }}
+              checked={form.autonomous_mode}
+              onChange={(e) => setForm({ ...form, autonomous_mode: e.target.checked })}
+            />
+          </label>
+          <p className="incident-time" style={{ marginTop: '0.2rem' }}>
+            When active, the platform will automatically run proposed SRE healing actions without prompting for manual approval.
           </p>
         </div>
 

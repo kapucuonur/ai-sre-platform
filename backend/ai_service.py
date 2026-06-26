@@ -18,6 +18,15 @@ def analyze_incident(service: str, alert_title: str, logs: str) -> dict:
             "proposed_command": ""
         }
 
+    past_incidents = db.get_past_incidents(service, alert_title)
+    past_context = ""
+    if past_incidents:
+        past_context = "\nGEÇMİŞ ONARIM GİRİŞİMLERİ (Bu hata/servis için önceki sonuçlar):\n"
+        for p in past_incidents:
+            status_str = "BAŞARILI ✅" if p["status"] == "resolved" else "BAŞARISIZ ❌"
+            past_context += f"- Komut: '{p['proposed_command']}' -> Durum: {status_str}\n"
+        past_context += "\nYukarıdaki geçmiş sonuçları dikkate al. Başarısız olan aksiyonları tekrar önerme. Başarılı olanları tercih et.\n"
+
     prompt = f"""You are a senior Site Reliability Engineer (SRE).
 An alert was triggered for the service: '{service}'
 Alert Title: {alert_title}
@@ -26,7 +35,7 @@ Recent log output:
 \"\"\"
 {logs}
 \"\"\"
-
+{past_context}
 GÖREV:
 1. Analiz et ve sorunun kök nedenini belirle (root-cause).
 2. Bu sorunu çözmek veya sistemi düzeltmek için çalıştırılabilecek en mantıklı, güvenli kabuk (shell/bash) komutunu belirle (örn: 'docker restart {service}').
@@ -78,7 +87,7 @@ JSON Şeması:
             "proposed_command": ""
         }
 
-def format_slack_blocks(incident_id: int, service: str, title: str, summary: str, reasoning: str, proposed_command: str) -> dict:
+def format_slack_blocks(incident_id: int, service: str, title: str, summary: str, reasoning: str, proposed_command: str, autonomous_status: str = None, action_output: str = None) -> dict:
     """
     Formats the incident report as Slack Block Kit blocks.
     """
@@ -108,15 +117,26 @@ def format_slack_blocks(incident_id: int, service: str, title: str, summary: str
     ]
 
     if proposed_command:
-        blocks.extend([
-            {
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*Proposed Remediation Action:*\n`{proposed_command}`"
+            }
+        })
+        if autonomous_status:
+            badge = "✅" if autonomous_status == "resolved" else "⚠️"
+            status_label = "SUCCESS" if autonomous_status == "resolved" else "FAILED"
+            msg = f"{badge} *Autonomous Action {status_label}*\n\n```\n{action_output[:400] if action_output else ''}\n```"
+            blocks.append({
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Proposed Remediation Action:*\n`{proposed_command}`"
+                    "text": msg
                 }
-            },
-            {
+            })
+        else:
+            blocks.append({
                 "type": "actions",
                 "block_id": f"incident_{incident_id}",
                 "elements": [
@@ -143,8 +163,7 @@ def format_slack_blocks(incident_id: int, service: str, title: str, summary: str
                         "action_id": "reject_action"
                     }
                 ]
-            }
-        ])
+            })
     else:
         blocks.append({
             "type": "section",
@@ -156,7 +175,7 @@ def format_slack_blocks(incident_id: int, service: str, title: str, summary: str
 
     return {"blocks": blocks}
 
-def send_to_slack(incident_id: int, service: str, title: str, summary: str, reasoning: str, proposed_command: str) -> bool:
+def send_to_slack(incident_id: int, service: str, title: str, summary: str, reasoning: str, proposed_command: str, autonomous_status: str = None, action_output: str = None) -> bool:
     """
     Sends the formatted incident blocks to the configured Slack channel.
     """
@@ -167,7 +186,7 @@ def send_to_slack(incident_id: int, service: str, title: str, summary: str, reas
         logger.warning("Slack credentials missing, skipping ChatOps alert.")
         return False
 
-    payload = format_slack_blocks(incident_id, service, title, summary, reasoning, proposed_command)
+    payload = format_slack_blocks(incident_id, service, title, summary, reasoning, proposed_command, autonomous_status, action_output)
     payload["channel"] = slack_channel
 
     headers = {

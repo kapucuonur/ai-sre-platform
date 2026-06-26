@@ -30,6 +30,7 @@ class SettingsModel(BaseModel):
     gemini_api_key: Optional[str] = None
     slack_bot_token: Optional[str] = None
     slack_channel_id: Optional[str] = None
+    autonomous_mode: Optional[bool] = None
 
 class ManualActionModel(BaseModel):
     action: str  # approve or reject
@@ -76,28 +77,63 @@ def process_incident(service: str, title: str, logs: str, alert_payload: dict):
     # Run AI Analysis
     analysis = ai_service.analyze_incident(service, title, logs)
     
-    # Save incident in SQLite
-    incident_id = db.create_incident(
-        title=title,
-        service=service,
-        alert_payload=alert_payload,
-        logs=logs,
-        ai_analysis=analysis["reasoning"],
-        proposed_command=analysis["proposed_command"]
-    )
+    # Check if autonomous mode is enabled
+    autonomous = db.get_setting("autonomous_mode", "false") == "true"
+    proposed_cmd = analysis["proposed_command"]
     
-    logger.info("Created incident ID: %s", incident_id)
-    
-    # If a remediation command is suggested, send interactive Slack card
-    if analysis["proposed_command"]:
+    if autonomous and proposed_cmd:
+        # Autonomous execution flow
+        incident_id = db.create_incident(
+            title=title,
+            service=service,
+            alert_payload=alert_payload,
+            logs=logs,
+            ai_analysis=analysis["reasoning"],
+            proposed_command=proposed_cmd
+        )
+        db.update_incident_status(incident_id, "approved")
+        
+        # Execute the action
+        output = action_service.execute_command(proposed_cmd)
+        is_success = "Exit Code: 0" in output
+        final_status = "resolved" if is_success else "failed"
+        
+        db.update_incident_status(incident_id, final_status, output)
+        
+        # Send notification to slack with status
         ai_service.send_to_slack(
             incident_id=incident_id,
             service=service,
             title=title,
             summary=analysis["summary"],
             reasoning=analysis["reasoning"],
-            proposed_command=analysis["proposed_command"]
+            proposed_command=proposed_cmd,
+            autonomous_status=final_status,
+            action_output=output
         )
+    else:
+        # Standard flow (needs approval for high/critical or just waiting)
+        incident_id = db.create_incident(
+            title=title,
+            service=service,
+            alert_payload=alert_payload,
+            logs=logs,
+            ai_analysis=analysis["reasoning"],
+            proposed_command=proposed_cmd
+        )
+        
+        logger.info("Created incident ID: %s", incident_id)
+        
+        # If a remediation command is suggested, send interactive Slack card
+        if proposed_cmd:
+            ai_service.send_to_slack(
+                incident_id=incident_id,
+                service=service,
+                title=title,
+                summary=analysis["summary"],
+                reasoning=analysis["reasoning"],
+                proposed_command=proposed_cmd
+            )
 
 @app.post("/api/webhook/slack/actions")
 async def slack_actions(request: Request, background_tasks: BackgroundTasks):
@@ -257,6 +293,10 @@ async def get_system_status():
 async def list_incidents():
     return db.get_all_incidents()
 
+@app.get("/api/history")
+async def get_history():
+    return db.get_all_incidents()
+
 @app.post("/api/incidents/{incident_id}/action")
 async def trigger_manual_action(incident_id: int, payload: ManualActionModel, background_tasks: BackgroundTasks):
     """
@@ -283,6 +323,8 @@ async def get_settings():
     settings = db.get_all_settings()
     # Mask API keys for safety
     def mask_key(k: str) -> str:
+        if not k:
+            return ""
         if len(k) < 8:
             return "***"
         return k[:4] + "..." + k[-4:]
@@ -290,7 +332,8 @@ async def get_settings():
     return {
         "gemini_api_key": mask_key(settings.get("GEMINI_API_KEY", "")),
         "slack_bot_token": mask_key(settings.get("SLACK_BOT_TOKEN", "")),
-        "slack_channel_id": settings.get("SLACK_CHANNEL_ID", "")
+        "slack_channel_id": settings.get("SLACK_CHANNEL_ID", ""),
+        "autonomous_mode": settings.get("autonomous_mode", "false") == "true"
     }
 
 @app.post("/api/settings")
@@ -305,6 +348,9 @@ async def save_settings(payload: SettingsModel):
         
     if payload.slack_channel_id is not None:
         db.set_setting("SLACK_CHANNEL_ID", payload.slack_channel_id)
+
+    if payload.autonomous_mode is not None:
+        db.set_setting("autonomous_mode", "true" if payload.autonomous_mode else "false")
         
     return {"status": "saved"}
 

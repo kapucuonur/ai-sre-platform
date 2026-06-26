@@ -47,7 +47,8 @@ def test_save_and_get_settings():
     payload = {
         "gemini_api_key": "AIzaSyTestKey123456",
         "slack_bot_token": "xoxb-test-token-value",
-        "slack_channel_id": "C012345678"
+        "slack_channel_id": "C012345678",
+        "autonomous_mode": True
     }
     response = client.post("/api/settings", json=payload)
     assert response.status_code == 200
@@ -60,6 +61,7 @@ def test_save_and_get_settings():
     assert data["gemini_api_key"] == "AIza...3456"
     assert data["slack_bot_token"] == "xoxb...alue"
     assert data["slack_channel_id"] == "C012345678"
+    assert data["autonomous_mode"] is True
 
 def test_create_and_list_incidents():
     # Create incident directly in DB helper
@@ -80,3 +82,39 @@ def test_create_and_list_incidents():
     assert len(incidents) >= 1
     assert incidents[0]["title"] == "Test Alert"
     assert incidents[0]["service"] == "test-service"
+
+def test_history_endpoint():
+    # Save an incident
+    db.create_incident(
+        title="History Test Alert",
+        service="history-service",
+        alert_payload={"alert": "yes"},
+        logs="history error",
+        ai_analysis="due to history",
+        proposed_command="echo history"
+    )
+    # Get history
+    response = client.get("/api/history")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) >= 1
+    assert history[0]["title"] == "History Test Alert"
+    assert history[0]["service"] == "history-service"
+
+def test_reflexive_past_incidents():
+    # Insert a past incident
+    db.create_incident(
+        title="Reflexive Alert",
+        service="reflexive-service",
+        alert_payload={},
+        logs="error logs",
+        ai_analysis="analysis",
+        proposed_command="docker restart reflexive"
+    )
+    # Set status
+    db.update_incident_status(1, "resolved", "Exit Code: 0")
+    
+    past = db.get_past_incidents("reflexive-service", "Reflexive Alert")
+    assert len(past) == 1
+    assert past[0]["proposed_command"] == "docker restart reflexive"
+    assert past[0]["status"] == "resolved"

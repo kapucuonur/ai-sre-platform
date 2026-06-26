@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
-import { LayoutDashboard, AlertTriangle, Sliders, Shield } from 'lucide-react'
+import { LayoutDashboard, AlertTriangle, Sliders, Shield, History as HistoryIcon } from 'lucide-react'
 import Dashboard from './components/Dashboard'
 import Incidents from './components/Incidents'
 import Settings from './components/Settings'
+import History from './components/History'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -13,6 +14,8 @@ function App() {
         return <Dashboard />
       case 'incidents':
         return <Incidents />
+      case 'history':
+        return <History />
       case 'settings':
         return <Settings />
       default:
@@ -47,6 +50,15 @@ function App() {
               >
                 <AlertTriangle size={18} />
                 Incidents
+              </button>
+            </li>
+            <li className="nav-item">
+              <button 
+                onClick={() => setActiveTab('history')} 
+                className={`nav-button ${activeTab === 'history' ? 'active' : ''}`}
+              >
+                <HistoryIcon size={18} />
+                History
               </button>
             </li>
             <li className="nav-item">

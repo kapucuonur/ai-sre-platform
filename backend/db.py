@@ -21,6 +21,8 @@ def init_db():
                 value TEXT NOT NULL
             )
         """)
+        # Initialize default settings
+        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('autonomous_mode', 'false')")
         # Incidents table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS incidents (
@@ -124,6 +126,23 @@ def get_incident(incident_id: int) -> dict:
             return dict(row) if row else None
     except Exception:
         return None
+
+def get_past_incidents(service: str, title: str, limit: int = 5) -> list:
+    try:
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT proposed_command, status, action_output 
+                FROM incidents 
+                WHERE service = ? AND title = ? AND proposed_command IS NOT NULL AND proposed_command != '' 
+                ORDER BY id DESC LIMIT ?
+                """,
+                (service, title, limit)
+            )
+            return [dict(row) for row in cur.fetchall()]
+    except Exception:
+        return []
 
 # Initial database migration
 init_db()
