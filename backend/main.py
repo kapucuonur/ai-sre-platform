@@ -35,6 +35,14 @@ class SettingsModel(BaseModel):
 class ManualActionModel(BaseModel):
     action: str  # approve or reject
 
+class DaemonIncidentModel(BaseModel):
+    service: str
+    title: str
+    logs: str
+    status: str
+    proposed_command: str
+    action_output: str
+
 # --- Core Webhooks ---
 
 @app.post("/api/webhook/grafana")
@@ -134,6 +142,36 @@ def process_incident(service: str, title: str, logs: str, alert_payload: dict):
                 reasoning=analysis["reasoning"],
                 proposed_command=proposed_cmd
             )
+
+@app.post("/api/daemon/incident")
+async def receive_daemon_incident(payload: DaemonIncidentModel):
+    """
+    Receives healing incidents reported by the local Pi 5 SRE Daemon.
+    """
+    incident_id = db.create_incident(
+        title=payload.title,
+        service=payload.service,
+        alert_payload={"source": "daemon"},
+        logs=payload.logs,
+        ai_analysis="Processed by local Pi 5 SRE Daemon.",
+        proposed_command=payload.proposed_command
+    )
+    # Map status to approved then resolved/failed
+    db.update_incident_status(incident_id, "approved")
+    db.update_incident_status(incident_id, payload.status, payload.action_output)
+    
+    # Notify Slack
+    ai_service.send_to_slack(
+        incident_id=incident_id,
+        service=payload.service,
+        title=payload.title,
+        summary=payload.title,
+        reasoning="Processed autonomously by local Pi 5 SRE Daemon.",
+        proposed_command=payload.proposed_command,
+        autonomous_status=payload.status,
+        action_output=payload.action_output
+    )
+    return {"status": "recorded", "incident_id": incident_id}
 
 @app.post("/api/webhook/slack/actions")
 async def slack_actions(request: Request, background_tasks: BackgroundTasks):

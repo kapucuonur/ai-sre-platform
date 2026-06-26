@@ -118,3 +118,22 @@ def test_reflexive_past_incidents():
     assert len(past) == 1
     assert past[0]["proposed_command"] == "docker restart reflexive"
     assert past[0]["status"] == "resolved"
+
+def test_receive_daemon_incident():
+    payload = {
+        "service": "daemon-service",
+        "title": "Daemon Failure Alert",
+        "logs": "stack trace line 10",
+        "status": "resolved",
+        "proposed_command": "docker restart daemon",
+        "action_output": "Exit Code: 0"
+    }
+    response = client.post("/api/daemon/incident", json=payload)
+    assert response.status_code == 200
+    assert response.json()["status"] == "recorded"
+    
+    # Verify in DB
+    inc = db.get_incident(response.json()["incident_id"])
+    assert inc is not None
+    assert inc["service"] == "daemon-service"
+    assert inc["status"] == "resolved"
