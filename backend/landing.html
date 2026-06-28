@@ -93,10 +93,11 @@ body{font-family:var(--font-mono,'JetBrains Mono',monospace);background:#080e14;
 <nav class="nav">
   <div class="logo">SRE<span>daemon</span></div>
   <div class="nav-links">
-    <a href="#">How it works</a>
-    <a href="#">Pricing</a>
-    <a href="#">Docs</a>
-    <a href="#">GitHub</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="#how-it-works">How it works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://github.com/kapucuonur/sre-daemon" target="_blank">GitHub</a>
   </div>
   <button class="nav-cta" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')">Start free →</button>
 </nav>
@@ -133,7 +134,7 @@ body{font-family:var(--font-mono,'JetBrains Mono',monospace);background:#080e14;
   </div>
 </div>
 
-<div class="section">
+<div class="section" id="how-it-works">
   <div class="section-label">How it works</div>
   <div class="section-title">Three layers of autonomous healing</div>
   <div class="how-grid">
@@ -175,7 +176,7 @@ body{font-family:var(--font-mono,'JetBrains Mono',monospace);background:#080e14;
   </div>
 </div>
 
-<div class="section" style="padding-top:0">
+<div class="section" id="pricing" style="padding-top:0">
   <div class="stats">
     <div class="stat"><div class="stat-num">&lt;3s</div><div class="stat-label">Registry hit response</div></div>
     <div class="stat"><div class="stat-num">$0</div><div class="stat-label">Cost on cache hit</div></div>
