@@ -663,6 +663,107 @@ body {
   white-space: nowrap;
   border: 0;
 }
+
+/* TriHonor Back Button */
+.btn-back {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: var(--transition);
+  font-family: var(--font-mono);
+}
+.btn-back:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: var(--transition);
+}
+.theme-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  transform: scale(1.05);
+}
+
+/* Language Dropdown Selector */
+.lang-select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  transition: var(--transition);
+}
+.lang-select:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Light Mode Overrides */
+body.light-theme {
+  --bg-base: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-card: #f1f5f9;
+  --border-color: rgba(15, 23, 42, 0.08);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --primary: #06b6d4;
+  --primary-hover: #0891b2;
+  --primary-glow: rgba(6, 182, 212, 0.1);
+}
+body.light-theme .term-body {
+  background: #04070a; /* Keep terminal dark for classic tech look */
+}
+body.light-theme .logo {
+  color: var(--text-primary);
+}
+body.light-theme .logo span {
+  color: var(--primary);
+}
+body.light-theme .btn-ghost {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+body.light-theme .btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+body.light-theme .plan.featured {
+  border-color: var(--primary);
+}
+body.light-theme .plan-cta.free {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+body.light-theme .plan-cta.free:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.2);
+}
 </style>
 </head>
 <body>
@@ -672,13 +773,26 @@ body {
 <nav class="nav">
   <div class="logo">SRE<span>daemon</span></div>
   <div class="nav-links">
-    <a href="/dashboard">Dashboard</a>
-    <a href="#how-it-works">How it works</a>
-    <a href="#pricing">Pricing</a>
+    <a href="https://trihonor.com" class="btn-back">← TriHonor</a>
+    <a href="/dashboard" data-i18n="nav_dashboard">Dashboard</a>
+    <a href="#how-it-works" data-i18n="nav_how">How it works</a>
+    <a href="#pricing" data-i18n="nav_pricing">Pricing</a>
     <a href="#faq">FAQ</a>
     <a href="https://github.com/kapucuonur/sre-daemon" target="_blank">GitHub</a>
   </div>
-  <button class="nav-cta" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')">Start free →</button>
+  <div style="display:flex;align-items:center;gap:10px">
+    <select class="lang-select" id="langSelect" onchange="setLang(this.value)">
+      <option value="en">🇬🇧 EN</option>
+      <option value="de">🇩🇪 DE</option>
+      <option value="it">🇮🇹 IT</option>
+      <option value="ru">🇷🇺 RU</option>
+      <option value="tr">🇹🇷 TR</option>
+      <option value="es">🇪🇸 ES</option>
+      <option value="sv">🇸🇪 SV</option>
+    </select>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+    <button class="nav-cta" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')" data-i18n="nav_cta">Start free →</button>
+  </div>
 </nav>
 
 <div class="hero">
@@ -906,6 +1020,124 @@ function sendPrompt(action) {
 function openLink(url) {
   window.open(url, '_blank');
 }
+
+// ── Theme Toggle ──
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  document.getElementById('themeToggle').textContent = isLight ? '☀️' : '🌙';
+  localStorage.setItem('sre_theme', isLight ? 'light' : 'dark');
+}
+(function() {
+  if (localStorage.getItem('sre_theme') === 'light') {
+    document.body.classList.add('light-theme');
+    document.getElementById('themeToggle').textContent = '☀️';
+  }
+})();
+
+// ── i18n Translations ──
+const TRANSLATIONS = {
+  en: {
+    nav_dashboard: 'Dashboard', nav_how: 'How it works', nav_pricing: 'Pricing', nav_cta: 'Start free →',
+    hero_eyebrow: '● NOW IN BETA',
+    hero_h1: 'Your infrastructure,', hero_h1_em: 'healed before you notice.',
+    hero_p: 'An autonomous SRE agent that watches your Linux servers, learns from every incident, and fixes problems without waking you up — on any VPS, bare metal, or cloud VM.',
+    btn_start: 'Get started free →', btn_demo: 'Watch demo',
+    how_label: 'How it works', how_title: 'Three layers of autonomous healing',
+    pricing_label: 'Pricing', pricing_title: 'One agent, pay as you grow',
+    faq_label: 'FAQ', faq_title: 'Common questions'
+  },
+  de: {
+    nav_dashboard: 'Dashboard', nav_how: 'So funktioniert es', nav_pricing: 'Preise', nav_cta: 'Kostenlos starten →',
+    hero_eyebrow: '● JETZT IN DER BETA',
+    hero_h1: 'Deine Infrastruktur,', hero_h1_em: 'geheilt bevor du es merkst.',
+    hero_p: 'Ein autonomer SRE-Agent, der deine Linux-Server überwacht, aus jedem Vorfall lernt und Probleme behebt, ohne dich zu wecken — auf jedem VPS, Bare-Metal oder Cloud-VM.',
+    btn_start: 'Kostenlos starten →', btn_demo: 'Demo ansehen',
+    how_label: 'So funktioniert es', how_title: 'Drei Schichten autonomer Heilung',
+    pricing_label: 'Preise', pricing_title: 'Ein Agent, zahle nach Wachstum',
+    faq_label: 'FAQ', faq_title: 'Häufige Fragen'
+  },
+  it: {
+    nav_dashboard: 'Dashboard', nav_how: 'Come funziona', nav_pricing: 'Prezzi', nav_cta: 'Inizia gratis →',
+    hero_eyebrow: '● ORA IN BETA',
+    hero_h1: 'La tua infrastruttura,', hero_h1_em: 'guarita prima che tu lo noti.',
+    hero_p: 'Un agente SRE autonomo che monitora i tuoi server Linux, impara da ogni incidente e risolve i problemi senza svegliarti — su qualsiasi VPS, bare metal o cloud VM.',
+    btn_start: 'Inizia gratis →', btn_demo: 'Guarda la demo',
+    how_label: 'Come funziona', how_title: 'Tre livelli di guarigione autonoma',
+    pricing_label: 'Prezzi', pricing_title: 'Un agente, paga man mano che cresci',
+    faq_label: 'FAQ', faq_title: 'Domande frequenti'
+  },
+  ru: {
+    nav_dashboard: 'Панель', nav_how: 'Как это работает', nav_pricing: 'Цены', nav_cta: 'Начать бесплатно →',
+    hero_eyebrow: '● СЕЙЧАС В БЕТА',
+    hero_h1: 'Ваша инфраструктура,', hero_h1_em: 'исправлена прежде чем вы заметите.',
+    hero_p: 'Автономный SRE-агент, который наблюдает за вашими Linux-серверами, учится на каждом инциденте и решает проблемы, не будя вас — на любом VPS, bare metal или облачной VM.',
+    btn_start: 'Начать бесплатно →', btn_demo: 'Смотреть демо',
+    how_label: 'Как это работает', how_title: 'Три уровня автономного исцеления',
+    pricing_label: 'Цены', pricing_title: 'Один агент, плати по мере роста',
+    faq_label: 'FAQ', faq_title: 'Частые вопросы'
+  },
+  tr: {
+    nav_dashboard: 'Dashboard', nav_how: 'Nasıl çalışır', nav_pricing: 'Fiyatlar', nav_cta: 'Ücretsiz başla →',
+    hero_eyebrow: '● BETA AŞAMASINDA',
+    hero_h1: 'Altyapın,', hero_h1_em: 'fark etmeden önce iyileşir.',
+    hero_p: 'Linux sunucularını izleyen, her olaydan öğrenen ve seni uyandırmadan sorunları çözen özerk bir SRE ajanı — her VPS, bare metal veya bulut VM üzerinde.',
+    btn_start: 'Ücretsiz başla →', btn_demo: 'Demo izle',
+    how_label: 'Nasıl çalışır', how_title: 'Üç katmanlı özerk iyileştirme',
+    pricing_label: 'Fiyatlar', pricing_title: 'Tek ajan, büydükçe öde',
+    faq_label: 'SSS', faq_title: 'Sık sorulan sorular'
+  },
+  es: {
+    nav_dashboard: 'Panel', nav_how: 'Cómo funciona', nav_pricing: 'Precios', nav_cta: 'Comenzar gratis →',
+    hero_eyebrow: '● AHORA EN BETA',
+    hero_h1: 'Tu infraestructura,', hero_h1_em: 'curada antes de que lo notes.',
+    hero_p: 'Un agente SRE autónomo que vigila tus servidores Linux, aprende de cada incidente y soluciona problemas sin despertarte — en cualquier VPS, bare metal o VM en la nube.',
+    btn_start: 'Comenzar gratis →', btn_demo: 'Ver demo',
+    how_label: 'Cómo funciona', how_title: 'Tres capas de curación autónoma',
+    pricing_label: 'Precios', pricing_title: 'Un agente, paga según creces',
+    faq_label: 'FAQ', faq_title: 'Preguntas frecuentes'
+  },
+  sv: {
+    nav_dashboard: 'Dashboard', nav_how: 'Hur det fungerar', nav_pricing: 'Priser', nav_cta: 'Börja gratis →',
+    hero_eyebrow: '● NU I BETA',
+    hero_h1: 'Din infrastruktur,', hero_h1_em: 'läkt innan du märker det.',
+    hero_p: 'En autonom SRE-agent som övervakar dina Linux-servrar, lär sig av varje incident och löser problem utan att väcka dig — på valfri VPS, bare metal eller moln-VM.',
+    btn_start: 'Börja gratis →', btn_demo: 'Se demo',
+    how_label: 'Hur det fungerar', how_title: 'Tre lager av autonom läkning',
+    pricing_label: 'Priser', pricing_title: 'En agent, betala i takt med tillväxt',
+    faq_label: 'FAQ', faq_title: 'Vanliga frågor'
+  }
+};
+
+function setLang(lang) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+  localStorage.setItem('sre_lang', lang);
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key]) el.textContent = t[key];
+  });
+  // Update hero separately (h1 has two parts)
+  const heroH1 = document.querySelector('.hero h1');
+  if (heroH1) heroH1.innerHTML = t.hero_h1 + '<br><em>' + t.hero_h1_em + '</em>';
+  const heroP = document.querySelector('.hero p');
+  if (heroP) heroP.textContent = t.hero_p;
+  const btnStart = document.querySelector('.btn-primary');
+  if (btnStart) btnStart.textContent = t.btn_start;
+  const btnDemo = document.querySelector('.btn-ghost');
+  if (btnDemo) btnDemo.textContent = t.btn_demo;
+  // section labels
+  const labels = document.querySelectorAll('.section-label');
+  const titles = document.querySelectorAll('.section-title');
+  const labelMap = [t.how_label, null, t.pricing_label, t.faq_label];
+  const titleMap = [t.how_title, null, t.pricing_title, t.faq_title];
+  labels.forEach((el, i) => { if (labelMap[i]) el.textContent = labelMap[i]; });
+  titles.forEach((el, i) => { if (titleMap[i]) el.textContent = titleMap[i]; });
+  document.getElementById('langSelect').value = lang;
+}
+
+(function() {
+  const saved = localStorage.getItem('sre_lang') || 'en';
+  setLang(saved);
+})();
 </script>
 </body>
 </html>
