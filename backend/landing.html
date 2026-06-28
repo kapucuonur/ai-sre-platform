@@ -83,6 +83,7 @@ body{font-family:var(--font-mono,'JetBrains Mono',monospace);background:#080e14;
 .footer-links{display:flex;gap:20px}
 .footer-links a{font-size:12px;color:#475569;text-decoration:none}
 .footer-links a:hover{color:#94a3b8}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 </style>
 </head>
 <body>
@@ -290,7 +291,7 @@ function sendPrompt(action) {
     const email = prompt("Please enter your email to start your 14-day Pro trial:", "user@example.com");
     if (!email) return;
     
-    fetch('http://localhost:8003/api/stripe/checkout', {
+    fetch('/api/stripe/checkout', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
