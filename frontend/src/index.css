@@ -475,3 +475,145 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/* ============================================================
+   Payment Success & Onboarding Styles
+   ============================================================ */
+.payment-loading-container, .payment-error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  gap: 1rem;
+  text-align: center;
+}
+
+.spinner-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--accent-cyan);
+  animation: spin 1.5s linear infinite;
+}
+
+.payment-success-card {
+  max-width: 650px;
+  margin: 60px auto;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 3rem 2.5rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+}
+
+.success-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.success-icon-wrapper {
+  display: inline-flex;
+  padding: 12px;
+  border-radius: 50%;
+  background-color: rgba(16, 185, 129, 0.1);
+  margin-bottom: 1.25rem;
+}
+
+.success-icon {
+  color: #10b981;
+}
+
+.plan-badge-custom {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  background-color: var(--accent-cyan-glow);
+  padding: 4px 12px;
+  border-radius: 12px;
+  margin-top: 8px;
+  letter-spacing: 1px;
+}
+
+.onboarding-step {
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.onboarding-step h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #fff;
+}
+
+.onboarding-step p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.code-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #0b0f19;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+.code-box code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--accent-cyan);
+  word-break: break-all;
+}
+
+.copy-button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: var(--transition-smooth);
+}
+
+.copy-button:hover {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.cmd-box code {
+  color: #a78bfa;
+}
+
+.btn-primary-custom {
+  background-color: var(--accent-cyan);
+  color: #0b0f19;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-primary-custom:hover {
+  background-color: #38bdf8;
+}
+
+.finish-btn {
+  width: 100%;
+  margin-top: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+

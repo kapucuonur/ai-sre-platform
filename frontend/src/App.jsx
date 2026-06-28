@@ -5,9 +5,22 @@ import Incidents from './components/Incidents'
 import Settings from './components/Settings'
 import History from './components/History'
 import Registry from './components/Registry'
+import PaymentSuccess from './components/PaymentSuccess'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
+
+  // Check if we are on the Stripe payment success page
+  const urlParams = new URLSearchParams(window.location.search)
+  const sessionId = urlParams.get('session_id')
+
+  if (sessionId) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', width: '100vw' }}>
+        <PaymentSuccess />
+      </div>
+    )
+  }
 
   const renderContent = () => {
     switch (activeTab) {

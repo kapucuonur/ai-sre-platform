@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -10,6 +10,8 @@ import db
 import ai_service
 import action_service
 import logging
+import stripe
+import secrets
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -148,10 +150,16 @@ def process_incident(service: str, title: str, logs: str, alert_payload: dict):
             )
 
 @app.post("/api/daemon/incident")
-async def receive_daemon_incident(payload: DaemonIncidentModel):
+async def receive_daemon_incident(payload: DaemonIncidentModel, x_sre_api_key: Optional[str] = Header(None, alias="X-SRE-API-Key")):
     """
     Receives healing incidents reported by the local Pi 5 SRE Daemon.
     """
+    active_keys = db.get_active_api_keys()
+    if active_keys:
+        if not x_sre_api_key or x_sre_api_key not in active_keys:
+            logger.warning("Unauthorized daemon incident report attempt.")
+            raise HTTPException(status_code=401, detail="Unauthorized SRE API Key.")
+
     incident_id = db.create_incident(
         title=payload.title,
         service=payload.service,
@@ -435,6 +443,181 @@ async def get_registry_analytics():
     except Exception as e:
         logger.error("Failed to query registry analytics: %s", e)
         return {"total_strategies": 0, "blacklist_rate": 0.0, "total_savings_tokens": 0, "entries": []}
+
+class CheckoutModel(BaseModel):
+    plan: str
+    email: str
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "sk_test_mock")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_mock")
+stripe.api_key = STRIPE_SECRET_KEY
+
+@app.post("/api/stripe/checkout")
+async def stripe_checkout(payload: CheckoutModel):
+    if STRIPE_SECRET_KEY == "sk_test_mock":
+        mock_session_id = f"cs_test_{secrets.token_hex(16)}"
+        success_url = f"http://localhost:5173/payment-success?session_id={mock_session_id}&plan={payload.plan}&email={payload.email}"
+        return {"url": success_url, "simulated": True}
+        
+    try:
+        price_id = os.getenv(f"STRIPE_PRICE_{payload.plan.upper()}")
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            customer_email=payload.email,
+            line_items=[
+                {
+                    "price": price_id,
+                    "quantity": 1,
+                } if price_id else {
+                    "price_data": {
+                        "currency": "eur",
+                        "product_data": {
+                            "name": f"SRE Daemon {payload.plan.capitalize()} Plan",
+                            "description": "Autonomous infrastructure healing service subscription.",
+                        },
+                        "unit_amount": 4900 if payload.plan == "pro" else 14900,
+                        "recurring": {"interval": "month"},
+                    },
+                    "quantity": 1,
+                }
+            ],
+            mode="subscription",
+            success_url="http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url="http://localhost:5173/pricing",
+            metadata={
+                "plan": payload.plan,
+                "email": payload.email
+            }
+        )
+        return {"url": checkout_session.url, "simulated": False}
+    except Exception as e:
+        logger.error("Failed to create Stripe checkout session: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/stripe/webhook")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    
+    event = None
+    if STRIPE_WEBHOOK_SECRET == "whsec_mock" or not sig_header:
+        try:
+            event = json.loads(payload)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid mock payload.")
+    else:
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, STRIPE_WEBHOOK_SECRET
+            )
+        except stripe.error.SignatureVerificationError as e:
+            logger.error("Webhook signature verification failed: %s", e)
+            raise HTTPException(status_code=400, detail="Invalid signature.")
+        except Exception as e:
+            logger.error("Webhook parsing error: %s", e)
+            raise HTTPException(status_code=400, detail=str(e))
+            
+    event_type = event.get("type")
+    logger.info("Stripe Webhook event received: %s", event_type)
+    
+    if event_type in ("checkout.session.completed", "customer.subscription.created"):
+        session = event.get("data", {}).get("object", {})
+        customer_id = session.get("customer")
+        subscription_id = session.get("subscription")
+        
+        metadata = session.get("metadata", {})
+        plan = metadata.get("plan", "pro")
+        email = metadata.get("email") or session.get("customer_details", {}).get("email")
+        
+        api_key = f"sre_live_{secrets.token_hex(16)}"
+        
+        db.create_or_update_subscription(
+            customer_id=customer_id,
+            subscription_id=subscription_id,
+            plan=plan,
+            status="active",
+            api_key=api_key
+        )
+        
+        if email:
+            send_onboarding_email(email, api_key, plan)
+            
+    elif event_type == "customer.subscription.updated":
+        sub = event.get("data", {}).get("object", {})
+        customer_id = sub.get("customer")
+        status = sub.get("status")
+        db.create_or_update_subscription(
+            customer_id=customer_id,
+            subscription_id=sub.get("id"),
+            plan="pro",
+            status=status
+        )
+        
+    elif event_type == "customer.subscription.deleted":
+        sub = event.get("data", {}).get("object", {})
+        customer_id = sub.get("customer")
+        db.create_or_update_subscription(
+            customer_id=customer_id,
+            subscription_id=sub.get("id"),
+            plan="pro",
+            status="canceled"
+        )
+        
+    return {"status": "success"}
+
+def send_onboarding_email(email: str, api_key: str, plan: str):
+    logger.info(
+        "\n"
+        "=================================================================\n"
+        "📧 ONBOARDING EMAIL SENT TO: %s\n"
+        "Plan: %s\n"
+        "API Key: %s\n"
+        "Welcome to SRE Daemon! Start self-healing your infrastructure:\n"
+        "curl -sSL https://sre-daemon.com/install.sh | SRE_API_KEY=%s bash\n"
+        "=================================================================\n",
+        email, plan.upper(), api_key, api_key
+    )
+
+@app.get("/api/stripe/subscription")
+def get_stripe_subscription(session_id: str):
+    if session_id.startswith("cs_test_"):
+        api_key = f"sre_live_mock_{session_id[-8:]}"
+        db.create_or_update_subscription(
+            customer_id=f"cus_{session_id[-8:]}",
+            subscription_id=f"sub_{session_id[-8:]}",
+            plan="pro",
+            status="active",
+            api_key=api_key
+        )
+        return {
+            "status": "active",
+            "plan": "pro",
+            "api_key": api_key,
+            "email": "user@example.com"
+        }
+        
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        sub_id = session.get("subscription")
+        if not sub_id:
+            return {"status": "pending"}
+            
+        with db.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM subscriptions WHERE stripe_subscription_id = ?", (sub_id,))
+            row = cur.fetchone()
+            if row:
+                return {
+                    "status": row["status"],
+                    "plan": row["plan"],
+                    "api_key": row["api_key"],
+                    "email": session.get("customer_details", {}).get("email")
+                }
+            else:
+                return {"status": "pending"}
+    except Exception as e:
+        logger.error("Failed to retrieve subscription: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Health check ---
 @app.get("/health")

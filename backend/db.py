@@ -45,6 +45,17 @@ def init_db():
             conn.execute("ALTER TABLE incidents ADD COLUMN duration REAL")
         except sqlite3.OperationalError:
             pass
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                stripe_customer_id TEXT PRIMARY KEY,
+                stripe_subscription_id TEXT,
+                plan TEXT NOT NULL,
+                status TEXT NOT NULL,
+                api_key TEXT UNIQUE,
+                created_at TEXT,
+                updated_at TEXT
+            )
+        """)
         conn.commit()
 
 def get_setting(key: str, default: str = "") -> str:
@@ -162,6 +173,57 @@ def get_past_incidents(service: str, title: str, limit: int = 5) -> list:
             return [dict(row) for row in cur.fetchall()]
     except Exception:
         return []
+
+def create_or_update_subscription(customer_id: str, subscription_id: str, plan: str, status: str, api_key: str = None) -> None:
+    now = datetime.now().isoformat()
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT api_key FROM subscriptions WHERE stripe_customer_id = ?", (customer_id,))
+        row = cur.fetchone()
+        
+        # Keep existing api_key if not provided
+        if row and not api_key:
+            api_key = row["api_key"]
+            
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO subscriptions 
+            (stripe_customer_id, stripe_subscription_id, plan, status, api_key, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (customer_id, subscription_id, plan, status, api_key, now, now)
+        )
+        conn.commit()
+
+def get_subscription_by_key(api_key: str) -> dict:
+    try:
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM subscriptions WHERE api_key = ?", (api_key,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+    except Exception:
+        return None
+
+def get_active_api_keys() -> set:
+    try:
+        with get_db() as conn:
+            cur = conn.cursor()
+            # Status can be 'active' or 'trialing'
+            cur.execute("SELECT api_key FROM subscriptions WHERE status IN ('active', 'trialing')")
+            return {row["api_key"] for row in cur.fetchall() if row["api_key"]}
+    except Exception:
+        return set()
+
+def get_subscription_by_customer(customer_id: str) -> dict:
+    try:
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM subscriptions WHERE stripe_customer_id = ?", (customer_id,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+    except Exception:
+        return None
 
 # Initial database migration
 init_db()

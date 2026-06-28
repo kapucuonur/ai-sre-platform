@@ -137,3 +137,77 @@ def test_receive_daemon_incident():
     assert inc is not None
     assert inc["service"] == "daemon-service"
     assert inc["status"] == "resolved"
+
+def test_stripe_checkout_simulated():
+    payload = {
+        "plan": "pro",
+        "email": "test@trihonor.com"
+    }
+    response = client.post("/api/stripe/checkout", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "url" in data
+    assert data["simulated"] is True
+    assert "payment-success" in data["url"]
+
+def test_stripe_webhook_simulated_success():
+    # Simulate a Stripe webhook call for checkout completion
+    payload = {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "customer": "cus_test_123",
+                "subscription": "sub_test_123",
+                "customer_details": {
+                    "email": "test@trihonor.com"
+                },
+                "metadata": {
+                    "plan": "pro",
+                    "email": "test@trihonor.com"
+                }
+            }
+        }
+    }
+    response = client.post("/api/stripe/webhook", json=payload)
+    assert response.status_code == 200
+    assert response.json() == {"status": "success"}
+
+    # Verify key was created and stored in active keys
+    active_keys = db.get_active_api_keys()
+    assert len(active_keys) == 1
+    api_key = list(active_keys)[0]
+    assert api_key.startswith("sre_live_")
+
+    # Verify subscription details
+    sub = db.get_subscription_by_customer("cus_test_123")
+    assert sub is not None
+    assert sub["status"] == "active"
+    assert sub["plan"] == "pro"
+    assert sub["api_key"] == api_key
+
+def test_daemon_incident_auth_check():
+    # 1. First register a subscription so active keys is not empty, which forces auth validation
+    db.create_or_update_subscription("cus_auth_test", "sub_auth_test", "pro", "active", "sre_live_validkey")
+    
+    payload = {
+        "service": "auth-test-service",
+        "title": "Auth test",
+        "logs": "some logs",
+        "status": "resolved",
+        "proposed_command": "echo",
+        "action_output": ""
+    }
+
+    # 2. Try with no API Key header (should fail with 401)
+    response = client.post("/api/daemon/incident", json=payload)
+    assert response.status_code == 401
+
+    # 3. Try with invalid API Key header (should fail with 401)
+    response = client.post("/api/daemon/incident", json=payload, headers={"X-SRE-API-Key": "sre_live_invalid"})
+    assert response.status_code == 401
+
+    # 4. Try with valid API Key header (should succeed)
+    response = client.post("/api/daemon/incident", json=payload, headers={"X-SRE-API-Key": "sre_live_validkey"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "recorded"
+
