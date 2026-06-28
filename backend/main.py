@@ -621,24 +621,33 @@ def get_stripe_subscription(session_id: str):
         logger.error("Failed to retrieve subscription: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- Frontend SPA Static serving ---
+# --- Landing page at root ---
+landing_page_path = os.path.join(os.path.dirname(__file__), "landing.html")
+
+@app.get("/")
+def serve_landing():
+    if os.path.exists(landing_page_path):
+        return FileResponse(landing_page_path)
+    raise HTTPException(status_code=404, detail="Landing page not found")
+
+# --- React Dashboard SPA at /dashboard/ ---
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend_dist")
 
-@app.get("/{path:path}")
-def serve_frontend_spa(path: str):
-    # Don't intercept API routes
-    if path.startswith("api/") or path.startswith("api") or path == "health":
-        raise HTTPException(status_code=404, detail="Not found")
+@app.get("/dashboard")
+@app.get("/dashboard/{path:path}")
+def serve_dashboard_spa(path: str = ""):
     full_path = os.path.join(frontend_dist_path, path)
     if path and "." in path.split("/")[-1] and os.path.exists(full_path):
         return FileResponse(full_path)
     index_path = os.path.join(frontend_dist_path, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    raise HTTPException(status_code=404, detail="File not found")
+    raise HTTPException(status_code=404, detail="Not found")
 
 if os.path.exists(frontend_dist_path):
-    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist_path, "assets")), name="assets")
+    assets_path = os.path.join(frontend_dist_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/dashboard/assets", StaticFiles(directory=assets_path), name="dashboard-assets")
 
 # --- Health check ---
 @app.get("/health")

@@ -1,0 +1,320 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-mono,'JetBrains Mono',monospace);background:#080e14;color:#c9d8e8;min-height:100vh}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 40px;border-bottom:0.5px solid rgba(255,255,255,.07);position:sticky;top:0;background:#080e14;z-index:10}
+.logo{font-size:15px;font-weight:500;color:#fff;letter-spacing:-.01em}
+.logo span{color:#22d3ee}
+.nav-links{display:flex;gap:28px;align-items:center}
+.nav-links a{font-size:12px;color:#64748b;text-decoration:none;letter-spacing:.04em}
+.nav-links a:hover{color:#c9d8e8}
+.nav-cta{background:#22d3ee;color:#080e14;border:none;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.04em}
+.nav-cta:hover{background:#38bdf8}
+.hero{padding:96px 40px 80px;max-width:900px;margin:0 auto;text-align:center}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(34,211,238,.08);border:0.5px solid rgba(34,211,238,.25);border-radius:20px;padding:5px 14px;font-size:11px;color:#22d3ee;letter-spacing:.08em;margin-bottom:28px}
+.dot{width:6px;height:6px;border-radius:50%;background:#22d3ee;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.hero h1{font-size:clamp(32px,5vw,52px);font-weight:700;line-height:1.1;letter-spacing:-.03em;color:#f0f6ff;margin-bottom:20px}
+.hero h1 em{font-style:normal;color:#22d3ee}
+.hero p{font-size:16px;color:#64748b;line-height:1.7;max-width:580px;margin:0 auto 36px;font-family:var(--font-sans,sans-serif)}
+.hero-ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn-primary{background:#22d3ee;color:#080e14;border:none;border-radius:7px;padding:12px 24px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.03em}
+.btn-primary:hover{background:#38bdf8}
+.btn-ghost{background:transparent;color:#94a3b8;border:0.5px solid rgba(255,255,255,.15);border-radius:7px;padding:12px 24px;font-size:13px;cursor:pointer;font-family:inherit;letter-spacing:.03em}
+.btn-ghost:hover{border-color:rgba(255,255,255,.35);color:#f0f6ff}
+.terminal{max-width:760px;margin:60px auto 0;background:#0b1420;border:0.5px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden}
+.term-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#0f1e2e;border-bottom:0.5px solid rgba(255,255,255,.07)}
+.term-dot{width:10px;height:10px;border-radius:50%}
+.term-title{font-size:11px;color:#475569;flex:1;text-align:center;letter-spacing:.04em}
+.term-body{padding:20px 24px;font-size:12px;line-height:2;min-height:180px}
+.t-muted{color:#334155}.t-cmd{color:#38bdf8}.t-ok{color:#4ade80}.t-warn{color:#fb923c}.t-val{color:#a78bfa}
+.section{padding:80px 40px;max-width:1000px;margin:0 auto}
+.section-label{font-size:11px;letter-spacing:.1em;color:#22d3ee;margin-bottom:12px;text-transform:uppercase}
+.section-title{font-size:clamp(22px,3vw,32px);font-weight:700;color:#f0f6ff;letter-spacing:-.02em;margin-bottom:40px}
+.how-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:rgba(255,255,255,.06);border-radius:10px;overflow:hidden}
+.how-step{background:#080e14;padding:28px 24px}
+.how-icon{font-size:22px;margin-bottom:14px}
+.how-step h3{font-size:14px;font-weight:600;color:#f0f6ff;margin-bottom:8px}
+.how-step p{font-size:12px;color:#64748b;line-height:1.7;font-family:var(--font-sans,sans-serif)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:64px}
+.stat{background:#0b1420;border:0.5px solid rgba(255,255,255,.08);border-radius:10px;padding:22px 20px;text-align:center}
+.stat-num{font-size:32px;font-weight:700;color:#22d3ee;letter-spacing:-.03em}
+.stat-label{font-size:11px;color:#64748b;margin-top:4px;letter-spacing:.04em}
+.pricing{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.plan{background:#0b1420;border:0.5px solid rgba(255,255,255,.08);border-radius:12px;padding:28px 24px;display:flex;flex-direction:column;gap:0}
+.plan.featured{border:1.5px solid #22d3ee;position:relative}
+.plan-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#22d3ee;color:#080e14;font-size:10px;font-weight:700;padding:3px 12px;border-radius:10px;letter-spacing:.06em;white-space:nowrap}
+.plan-name{font-size:11px;letter-spacing:.1em;color:#64748b;margin-bottom:10px}
+.plan-price{font-size:36px;font-weight:700;color:#f0f6ff;letter-spacing:-.03em}
+.plan-price span{font-size:14px;color:#64748b;font-weight:400}
+.plan-desc{font-size:12px;color:#64748b;margin:10px 0 20px;line-height:1.6;font-family:var(--font-sans,sans-serif)}
+.plan-divider{height:0.5px;background:rgba(255,255,255,.07);margin-bottom:20px}
+.plan-features{list-style:none;display:flex;flex-direction:column;gap:10px;flex:1}
+.plan-features li{font-size:12px;color:#94a3b8;display:flex;align-items:flex-start;gap:8px;line-height:1.5;font-family:var(--font-sans,sans-serif)}
+.plan-features li::before{content:'✓';color:#4ade80;font-weight:700;flex-shrink:0;margin-top:1px}
+.plan-features li.no::before{content:'—';color:#334155}
+.plan-features li.no{color:#334155}
+.plan-cta{margin-top:24px;width:100%;padding:11px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.03em;border:none}
+.plan-cta.free{background:rgba(255,255,255,.06);color:#94a3b8;border:0.5px solid rgba(255,255,255,.1)}
+.plan-cta.free:hover{background:rgba(255,255,255,.1)}
+.plan-cta.pro{background:#22d3ee;color:#080e14}
+.plan-cta.pro:hover{background:#38bdf8}
+.plan-cta.ent{background:rgba(167,139,250,.12);color:#a78bfa;border:0.5px solid rgba(167,139,250,.3)}
+.plan-cta.ent:hover{background:rgba(167,139,250,.2)}
+.compat{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.compat-tag{background:#0b1420;border:0.5px solid rgba(255,255,255,.1);border-radius:6px;padding:6px 12px;font-size:11px;color:#64748b;letter-spacing:.04em}
+.compat-tag.ready{border-color:rgba(74,222,128,.3);color:#4ade80}
+.compat-tag.soon{border-color:rgba(251,191,36,.25);color:#fbbf24}
+.faq{display:flex;flex-direction:column;gap:0}
+.faq-item{border-bottom:0.5px solid rgba(255,255,255,.07);padding:22px 0;cursor:pointer}
+.faq-q{font-size:14px;color:#f0f6ff;display:flex;justify-content:space-between;align-items:center;gap:16px}
+.faq-q span{font-size:18px;color:#334155;flex-shrink:0}
+.faq-a{font-size:13px;color:#64748b;line-height:1.7;margin-top:12px;font-family:var(--font-sans,sans-serif);display:none}
+.faq-item.open .faq-a{display:block}
+.faq-item.open .faq-q span{color:#22d3ee}
+.footer{border-top:0.5px solid rgba(255,255,255,.07);padding:32px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.footer-left{font-size:12px;color:#334155}
+.footer-links{display:flex;gap:20px}
+.footer-links a{font-size:12px;color:#475569;text-decoration:none}
+.footer-links a:hover{color:#94a3b8}
+</style>
+
+<h2 class="sr-only">SRE Daemon — autonomous infrastructure healing service landing page</h2>
+
+<nav class="nav">
+  <div class="logo">SRE<span>daemon</span></div>
+  <div class="nav-links">
+    <a href="#">How it works</a>
+    <a href="#">Pricing</a>
+    <a href="#">Docs</a>
+    <a href="#">GitHub</a>
+  </div>
+  <button class="nav-cta" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')">Start free →</button>
+</nav>
+
+<div class="hero">
+  <div class="eyebrow"><span class="dot"></span>NOW IN BETA</div>
+  <h1>Your infrastructure,<br><em>healed before you notice.</em></h1>
+  <p>An autonomous SRE agent that watches your Linux servers, learns from every incident, and fixes problems without waking you up — on any VPS, bare metal, or cloud VM.</p>
+  <div class="hero-ctas">
+    <button class="btn-primary" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')">Get started free →</button>
+    <button class="btn-ghost" onclick="sendPrompt('Demo video script yaz, 2 dakika, gerçek Pi log scrollu ile')">Watch demo</button>
+  </div>
+</div>
+
+<div class="terminal" style="max-width:760px;margin:0 auto 0;padding:0 40px 60px">
+  <div style="margin:0 -40px">
+  <div class="term-bar">
+    <div class="term-dot" style="background:#ff5f57"></div>
+    <div class="term-dot" style="background:#febc2e"></div>
+    <div class="term-dot" style="background:#28c840"></div>
+    <div class="term-title">trihonor — sre-daemon live</div>
+  </div>
+  <div class="term-body">
+    <div><span class="t-muted">Jun 28 20:07:51</span> <span class="t-cmd">[DOCKER]</span> coachonurai exited — OOMKilled (exit 137)</div>
+    <div><span class="t-muted">Jun 28 20:07:51</span> <span class="t-cmd">[REGISTRY HIT]</span> <span class="t-val">hash=a1b2c3d4</span> — cached strategy found</div>
+    <div><span class="t-muted">Jun 28 20:07:51</span> <span class="t-ok">[HEAL]</span> Executing: <span class="t-val">docker restart coachonurai</span></div>
+    <div><span class="t-muted">Jun 28 20:07:54</span> <span class="t-ok">[HEAL]</span> ✓ Container healthy — <span class="t-val">LLM cost: $0.0000</span></div>
+    <div style="margin-top:8px"><span class="t-muted">Jun 28 20:22:44</span> <span class="t-cmd">[DOCKER]</span> bikefitai exited — OOMKilled (exit 137)</div>
+    <div><span class="t-muted">Jun 28 20:22:44</span> <span class="t-cmd">[REGISTRY HIT]</span> <span class="t-val">hash=a1b2c3d4</span> — generalized from coachonurai</div>
+    <div><span class="t-muted">Jun 28 20:22:47</span> <span class="t-ok">[HEAL]</span> ✓ Container healthy — <span class="t-val">LLM cost: $0.0000</span></div>
+    <div style="margin-top:8px"><span class="t-muted">Jun 28 20:31:02</span> <span class="t-warn">[COMPLEX]</span> postgres — replication lag 48s — routing to Claude Sonnet</div>
+    <div><span class="t-muted">Jun 28 20:31:09</span> <span class="t-ok">[HEAL]</span> ✓ WAL cleared — registered to registry — <span class="t-val">cost: $0.0050</span></div>
+  </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">How it works</div>
+  <div class="section-title">Three layers of autonomous healing</div>
+  <div class="how-grid">
+    <div class="how-step">
+      <div class="how-icon">🧠</div>
+      <h3>Strategy registry</h3>
+      <p>Remembers every fix that ever worked. Same error on any container? Resolved instantly with zero API cost.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-icon">⚡</div>
+      <h3>Local LLM first</h3>
+      <p>Simple incidents routed to on-device Ollama. No network call, no latency, no cost — decision in under 2 seconds.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-icon">☁️</div>
+      <h3>Cloud escalation</h3>
+      <p>Complex incidents route to Gemini Flash or Claude Sonnet based on severity score. Humans only see true emergencies.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-icon">📉</div>
+      <h3>Weight decay</h3>
+      <p>Old fixes automatically age out. Stale solutions re-escalate to LLMs so the system never gets stuck in the past.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="padding-top:0">
+  <div class="section-label">Infrastructure support</div>
+  <div class="section-title">Runs on any Linux — today and tomorrow</div>
+  <div class="compat">
+    <span class="compat-tag ready">✓ Bare metal Linux</span>
+    <span class="compat-tag ready">✓ Raspberry Pi</span>
+    <span class="compat-tag ready">✓ DigitalOcean VPS</span>
+    <span class="compat-tag ready">✓ AWS EC2</span>
+    <span class="compat-tag ready">✓ Docker / systemd</span>
+    <span class="compat-tag soon">◎ Kubernetes — Q3 2026</span>
+    <span class="compat-tag soon">◎ Web / API uptime — Q4 2026</span>
+    <span class="compat-tag soon">◎ Security anomaly detection — 2027</span>
+  </div>
+</div>
+
+<div class="section" style="padding-top:0">
+  <div class="stats">
+    <div class="stat"><div class="stat-num">&lt;3s</div><div class="stat-label">Registry hit response</div></div>
+    <div class="stat"><div class="stat-num">$0</div><div class="stat-label">Cost on cache hit</div></div>
+    <div class="stat"><div class="stat-num">24/7</div><div class="stat-label">Autonomous healing</div></div>
+    <div class="stat"><div class="stat-num">∞</div><div class="stat-label">Containers watched</div></div>
+  </div>
+
+  <div class="section-label">Pricing</div>
+  <div class="section-title">One agent, pay as you grow</div>
+  <div class="pricing">
+    <div class="plan">
+      <div class="plan-name">STARTER</div>
+      <div class="plan-price">€0 <span>/ month</span></div>
+      <div class="plan-desc">Self-host on your own server. Full daemon, full features, no limits.</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        <li>Unlimited containers</li>
+        <li>Strategy registry + learning</li>
+        <li>Telegram + Slack alerts</li>
+        <li>Local Ollama routing</li>
+        <li class="no">Platform dashboard</li>
+        <li class="no">Managed updates</li>
+        <li class="no">Priority support</li>
+      </ul>
+      <button class="plan-cta free" onclick="openLink('https://github.com/kapucuonur/sre-daemon')">View on GitHub →</button>
+    </div>
+
+    <div class="plan featured">
+      <div class="plan-badge">MOST POPULAR</div>
+      <div class="plan-name">PRO</div>
+      <div class="plan-price">€49 <span>/ month</span></div>
+      <div class="plan-desc">Hosted dashboard, managed updates, and cloud LLM budget included.</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        <li>Everything in Starter</li>
+        <li>SRE Platform dashboard</li>
+        <li>€5 cloud LLM budget / mo</li>
+        <li>Managed daemon updates</li>
+        <li>Registry analytics</li>
+        <li>Email support (48h)</li>
+        <li class="no">Custom LLM routing</li>
+      </ul>
+      <button class="plan-cta pro" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')">Start 14-day trial →</button>
+    </div>
+
+    <div class="plan">
+      <div class="plan-name">SCALE</div>
+      <div class="plan-price">€149 <span>/ month</span></div>
+      <div class="plan-desc">For teams running critical infrastructure across multiple servers.</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        <li>Everything in Pro</li>
+        <li>Up to 10 servers</li>
+        <li>€20 cloud LLM budget / mo</li>
+        <li>Custom LLM routing rules</li>
+        <li>Webhook integrations</li>
+        <li>Slack support channel</li>
+        <li>SLA 99.9% uptime</li>
+      </ul>
+      <button class="plan-cta ent" onclick="sendPrompt('Scale plan için sales email taslağı yaz')">Talk to us →</button>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="padding-top:0">
+  <div class="section-label">FAQ</div>
+  <div class="section-title">Common questions</div>
+  <div class="faq" id="faq">
+    <div class="faq-item">
+      <div class="faq-q">Does it need cloud access to work? <span>+</span></div>
+      <div class="faq-a">No. The core healing loop runs entirely on your server using local Ollama. Cloud LLMs (Gemini, Claude) are only called for complex incidents you configure a budget for. If you set budget to zero, it never touches the internet.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What if the daemon makes a wrong fix? <span>+</span></div>
+      <div class="faq-a">Every action is logged to an audit trail (heal_log.jsonl). Failed commands are automatically blacklisted in the strategy registry and the weight decay system forces re-evaluation over time. You can review and roll back any action from the dashboard.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Can it watch non-Docker services? <span>+</span></div>
+      <div class="faq-a">Yes. The daemon monitors both Docker events and systemd/syslog. Any service visible in journald is auto-discovered and added to the watch list.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">How is this different from PagerDuty or Datadog? <span>+</span></div>
+      <div class="faq-a">Those tools alert you and wait for a human. SRE Daemon acts — it tries known fixes first (zero cost), escalates to AI only when needed, and learns from every outcome. You get paged only when all automated options are exhausted.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What's the roadmap after Linux? <span>+</span></div>
+      <div class="faq-a">Kubernetes pod monitoring in Q3 2026, HTTP/API uptime checks in Q4 2026, and a security anomaly detection module planned for 2027 as a separate product line.</div>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="footer-left">© 2026 TriHonor Oy · Tampere, Finland</div>
+  <div class="footer-links">
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+    <a href="#">GitHub</a>
+    <a href="#">Status</a>
+  </div>
+</footer>
+
+<script>
+document.getElementById('faq').addEventListener('click',function(e){
+  var item=e.target.closest('.faq-item');
+  if(!item)return;
+  var wasOpen=item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(function(i){i.classList.remove('open')});
+  if(!wasOpen)item.classList.add('open');
+});
+
+function sendPrompt(action) {
+  if (action.includes('Stripe') || action.includes('onboarding') || action.includes('trial')) {
+    const email = prompt("Please enter your email to start your 14-day Pro trial:", "user@example.com");
+    if (!email) return;
+    
+    fetch('http://localhost:8003/api/stripe/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        plan: 'pro',
+        email: email
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Failed to start checkout. Check if SRE Platform API is running.");
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Error starting checkout: " + err.message);
+    });
+  } else if (action.includes('Scale') || action.includes('Talk to us')) {
+    const email = prompt("Please enter your email and our SRE sales team will reach out to you:", "enterprise@example.com");
+    if (email) {
+      alert("Thanks! We will contact you at " + email + " shortly.");
+    }
+  } else {
+    alert("Triggered action: " + action);
+  }
+}
+
+function openLink(url) {
+  window.open(url, '_blank');
+}
+</script>

@@ -23,6 +23,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ .
+COPY backend/landing.html /app/landing.html
 COPY --from=frontend-builder /frontend/dist /app/frontend_dist
 
 EXPOSE 8000
