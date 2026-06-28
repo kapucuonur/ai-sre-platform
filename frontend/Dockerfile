@@ -4,19 +4,21 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 COPY . .
+ARG VITE_API_URL=https://sre-api.trihonor.com
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Inline Nginx configuration to support SPA routing and API proxying
+# Inline Nginx configuration to support SPA routing under /sre and API proxying
 RUN echo 'server { \
     listen 80; \
-    location / { \
-        root /usr/share/nginx/html; \
+    location /sre { \
+        alias /usr/share/nginx/html; \
         index index.html index.htm; \
-        try_files $uri $uri/ /index.html; \
+        try_files $uri $uri/ /sre/index.html; \
     } \
     location /api { \
         proxy_pass http://backend:8000; \
