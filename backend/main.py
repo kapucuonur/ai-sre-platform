@@ -624,16 +624,21 @@ def get_stripe_subscription(session_id: str):
 # --- Frontend SPA Static serving ---
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend_dist")
 
-@app.get("/sre/{path:path}")
+@app.get("/{path:path}")
 def serve_frontend_spa(path: str):
+    # Don't intercept API routes
+    if path.startswith("api/") or path.startswith("api") or path == "health":
+        raise HTTPException(status_code=404, detail="Not found")
+    full_path = os.path.join(frontend_dist_path, path)
+    if path and "." in path.split("/")[-1] and os.path.exists(full_path):
+        return FileResponse(full_path)
     index_path = os.path.join(frontend_dist_path, "index.html")
-    if not path or "." not in path:
-        if os.path.exists(index_path):
-            return FileResponse(index_path)
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     raise HTTPException(status_code=404, detail="File not found")
 
 if os.path.exists(frontend_dist_path):
-    app.mount("/sre", StaticFiles(directory=frontend_dist_path, html=True), name="sre")
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist_path, "assets")), name="assets")
 
 # --- Health check ---
 @app.get("/health")
