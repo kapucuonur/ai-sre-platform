@@ -109,10 +109,65 @@ def query_ollama(prompt: str) -> str:
         logger.warning("Ollama call failed: %s", e)
         return None
 
+def query_claude(prompt: str) -> str:
+    """Helper to query Anthropic Claude API."""
+    claude_key = db.get_setting("CLAUDE_API_KEY") or db.get_setting("ANTHROPIC_API_KEY")
+    if not claude_key:
+        logger.warning("Claude API key not set in database.")
+        return None
+    try:
+        url = "https://api.anthropic.com/v1/messages"
+        headers = {
+            "x-api-key": claude_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+        payload = {
+            "model": "claude-3-5-sonnet-20241022",
+            "max_tokens": 1000,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+        return resp.json()["content"][0]["text"].strip()
+    except Exception as e:
+        logger.error("Claude API call failed: %s", e)
+        return None
+
+def increment_cost(provider: str):
+    """Tracks and accumulates monetary API expenditure."""
+    cost_map = {
+        "gemini": 0.0001,
+        "claude": 0.0050,
+    }
+    cost = cost_map.get(provider, 0.0)
+    if cost <= 0.0:
+        return
+    
+    try:
+        with db.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT val FROM settings WHERE key = 'total_spent'")
+            row = cur.fetchone()
+            current_spent = float(row[0]) if row else 0.0
+            new_spent = current_spent + cost
+            
+            conn.execute(
+                "INSERT INTO settings (key, val) VALUES ('total_spent', ?) "
+                "ON CONFLICT(key) DO UPDATE SET val = ?",
+                (str(new_spent), str(new_spent))
+            )
+            conn.commit()
+            logger.info("Antigravity modunda %s üzerinden $%.4f harcandı. Toplam harcama: $%.4f", provider, cost, new_spent)
+    except Exception as e:
+        logger.error("Cost tracking error: %s", e)
+
 def analyze_incident(service: str, alert_title: str, logs: str) -> dict:
     """
-    Sends logs and alert data to Gemini/Ollama to get root-cause analysis and proposed action.
-    Returns a dict with summary, reasoning, and proposed_command.
+    Sends logs and alert data through the multi-layered Antigravity AI routing pipeline.
+    1. Loop-prevention check (cooldown) if past attempts kept failing.
+    2. Local routing check (Qwen 7b) to see if it is simple or complex.
+    3. If complex, pro-actively switches between Claude (architectural) and Gemini (routine).
     """
     # 1. Truce Check (Ateşkes)
     truce_key = (service, alert_title)
@@ -123,10 +178,69 @@ def analyze_incident(service: str, alert_title: str, logs: str) -> dict:
             logger.info("Truce active for (%s, %s). Returning previous analysis.", service, alert_title)
             return prev_analysis
 
-    # Apply Log Summarization
+    # Fetch past incidents for loop prevention
+    past_incidents = db.get_past_incidents(service, alert_title)
+    if len(past_incidents) >= 2:
+        last_two_failed = all(p.get("status") == "failed" for p in past_incidents[:2])
+        if last_two_failed:
+            logger.warning("Feedback loop detected! Last 2 recovery attempts failed for (%s, %s). Halting AI intervention.", service, alert_title)
+            return {
+                "summary": "AI Onarım Döngüsü Engellendi",
+                "reasoning": "Bu hata için yapılan son 2 otomatik iyileştirme denemesi başarısız oldu. Sonsuz döngüyü engellemek amacıyla yapay zeka müdahalesi durdurulmuştur. Lütfen sistemi manuel kontrol edin.",
+                "proposed_command": ""
+            }
+
+    # Apply Log Summarization (Compressor)
     summarized_logs = summarize_log(logs)
 
-    past_incidents = db.get_past_incidents(service, alert_title)
+    # Stage 1: Local routing check using Qwen 7b
+    prompt_local = f"""You are a site reliability analysis router.
+Determine if the following alert can be fixed with a simple routine command (like restarting a docker container, deleting temp files, restarting a service).
+Service: '{service}'
+Alert Title: {alert_title}
+Logs:
+{summarized_logs}
+
+Output ONLY a JSON response in the following schema:
+{{
+  "simple": true or false,
+  "complexity": 1-10 rating,
+  "reasoning": "Turkish explanation of findings",
+  "proposed_command": "remediation command if simple, or empty string"
+}}
+"""
+    ollama_enabled = db.get_setting("OLLAMA_ENABLED", "true") == "true"
+    is_simple = False
+    complexity = 5
+    local_data = {}
+    
+    if ollama_enabled:
+        logger.info("Attempting local Qwen routing check...")
+        local_result = query_ollama(prompt_local)
+        if local_result:
+            try:
+                cleaned_local = local_result.strip()
+                if cleaned_local.startswith("```json"):
+                    cleaned_local = cleaned_local[7:]
+                if cleaned_local.endswith("```"):
+                    cleaned_local = cleaned_local[:-3]
+                local_data = json.loads(cleaned_local.strip())
+                is_simple = local_data.get("simple", False)
+                complexity = local_data.get("complexity", 5)
+            except Exception as e:
+                logger.warning("Local Qwen JSON parse failed: %s. Raw response: %s", e, local_result)
+
+    if is_simple and local_data.get("proposed_command"):
+        logger.info("Local Qwen resolved the incident as simple. Bypassing cloud models.")
+        analysis_result = {
+            "summary": local_data.get("reasoning", "Basit rutin hata çözümü (Lokal)"),
+            "reasoning": f"{local_data.get('reasoning', 'Yerel model tarafından otonom olarak çözüldü.')} (Source: local-ollama)",
+            "proposed_command": local_data.get("proposed_command", "")
+        }
+        TRUCE_CACHE[truce_key] = (now, analysis_result)
+        return analysis_result
+
+    # Stage 2 & 3: Cloud routing (Pro-Active Switching: Claude vs Gemini)
     past_context = ""
     if past_incidents:
         past_context = "\nGEÇMİŞ ONARIM GİRİŞİMLERİ (Bu hata/servis için önceki sonuçlar):\n"
@@ -135,7 +249,7 @@ def analyze_incident(service: str, alert_title: str, logs: str) -> dict:
             past_context += f"- Komut: '{p['proposed_command']}' -> Durum: {status_str}\n"
         past_context += "\nYukarıdaki geçmiş sonuçları dikkate al. Başarısız olan aksiyonları tekrar önerme. Başarılı olanları tercih et.\n"
 
-    prompt = f"""You are a senior Site Reliability Engineer (SRE).
+    prompt_cloud = f"""You are a senior Site Reliability Engineer (SRE).
 An alert was triggered for the service: '{service}'
 Alert Title: {alert_title}
 
@@ -149,6 +263,10 @@ GÖREV:
 2. Bu sorunu çözmek veya sistemi düzeltmek için çalıştırılabilecek en mantıklı, güvenli kabuk (shell/bash) komutunu belirle (örn: 'docker restart {service}').
 3. Eğer durum kritik değilse veya otomatik olarak çalıştırılacak güvenli bir komut yoksa 'proposed_command' alanını boş bırak.
 
+TOKEN TASARRUFU TALİMATI (Compressor):
+- Analizini olabildiğince kısa, öz ve net tut.
+- Sadece hata kodunu, dosya yolunu, hata tipini ve doğrudan kök nedeni belirt. Gereksiz veya uzun açıklamalar yapmaktan kaçın.
+
 ÖNEMLİ: Cevabı kesinlikle aşağıdaki JSON şemasında dön. Başka hiçbir açıklama, markdown bloğu veya süsleme yapma. Cevap sadece geçerli bir JSON objesi olmalı.
 
 JSON Şeması:
@@ -160,27 +278,37 @@ JSON Şeması:
 """
 
     gemini_key = db.get_setting("GEMINI_API_KEY")
+    claude_key = db.get_setting("CLAUDE_API_KEY") or db.get_setting("ANTHROPIC_API_KEY")
     result_text = None
     source = None
 
-    # 1. Local Ollama (Local First)
-    ollama_enabled = db.get_setting("OLLAMA_ENABLED", "true") == "true"
-    if ollama_enabled:
-        logger.info("Attempting local Ollama analysis...")
-        result_text = query_ollama(prompt)
-        if result_text:
-            source = "local-ollama"
+    # Decide provider based on complexity
+    primary_provider = "claude" if (complexity >= 8 and claude_key) else "gemini"
+    
+    # Try primary provider
+    if primary_provider == "claude":
+        daily_limit = int(db.get_setting("DAILY_CLAUDE_LIMIT", "5"))
+        current_calls = get_daily_calls("claude")
+        if current_calls < daily_limit:
+            logger.info("Routing complex incident (complexity %d) to Claude (%d/%d calls)...", complexity, current_calls, daily_limit)
+            result_text = query_claude(prompt_cloud)
+            if result_text:
+                source = "claude"
+                increment_daily_calls("claude")
+                increment_cost("claude")
+        else:
+            logger.warning("Claude daily budget reached. Falling back to Gemini.")
+            primary_provider = "gemini"
 
-    # 2. Cloud Gemini (under budget control)
-    if not result_text and gemini_key:
+    if not result_text and primary_provider == "gemini" and gemini_key:
         daily_limit = int(db.get_setting("DAILY_GEMINI_LIMIT", "100"))
         current_calls = get_daily_calls("gemini")
         if current_calls < daily_limit:
-            logger.info("Attempting cloud Gemini analysis (%d/%d calls)...", current_calls, daily_limit)
+            logger.info("Routing incident (complexity %d) to Gemini (%d/%d calls)...", complexity, current_calls, daily_limit)
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
             headers = {"Content-Type": "application/json"}
             payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
+                "contents": [{"parts": [{"text": prompt_cloud}]}],
                 "generationConfig": {"responseMimeType": "application/json"}
             }
             try:
@@ -190,15 +318,58 @@ JSON Şeması:
                 result_text = res_json["candidates"][0]["content"]["parts"][0]["text"].strip()
                 source = "gemini"
                 increment_daily_calls("gemini")
+                increment_cost("gemini")
             except Exception as e:
                 logger.error("Gemini API call failed: %s", e)
         else:
-            logger.warning("Gemini daily API budget reached. Falling back.")
+            logger.warning("Gemini daily budget reached. Falling back.")
+
+    # Second-chance fallback if primary choice failed/over-budget
+    if not result_text:
+        # If Claude failed, try Gemini as fallback
+        if primary_provider == "claude" and gemini_key:
+            daily_limit = int(db.get_setting("DAILY_GEMINI_LIMIT", "100"))
+            current_calls = get_daily_calls("gemini")
+            if current_calls < daily_limit:
+                logger.info("Claude failed. Trying Gemini fallback...")
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+                headers = {"Content-Type": "application/json"}
+                payload = {
+                    "contents": [{"parts": [{"text": prompt_cloud}]}],
+                    "generationConfig": {"responseMimeType": "application/json"}
+                }
+                try:
+                    resp = requests.post(url, json=payload, headers=headers, timeout=30)
+                    resp.raise_for_status()
+                    res_json = resp.json()
+                    result_text = res_json["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    source = "gemini-fallback"
+                    increment_daily_calls("gemini")
+                    increment_cost("gemini")
+                except Exception as e:
+                    logger.error("Gemini fallback failed: %s", e)
+        # If Gemini failed, try Claude as fallback
+        elif primary_provider == "gemini" and claude_key:
+            daily_limit = int(db.get_setting("DAILY_CLAUDE_LIMIT", "5"))
+            current_calls = get_daily_calls("claude")
+            if current_calls < daily_limit:
+                logger.info("Gemini failed. Trying Claude fallback...")
+                result_text = query_claude(prompt_cloud)
+                if result_text:
+                    source = "claude-fallback"
+                    increment_daily_calls("claude")
+                    increment_cost("claude")
+
+    # Local Ollama fallback if all cloud options failed
+    if not result_text and ollama_enabled:
+        logger.info("All cloud options failed. Falling back to local Ollama...")
+        result_text = query_ollama(prompt_cloud)
+        if result_text:
+            source = "local-ollama-fallback"
 
     analysis_result = None
     if result_text:
         try:
-            # Clean markdown codeblocks
             cleaned = result_text.strip()
             if cleaned.startswith("```json"):
                 cleaned = cleaned[7:]
