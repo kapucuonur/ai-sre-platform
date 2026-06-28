@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import { LayoutDashboard, AlertTriangle, Sliders, Shield, History as HistoryIcon } from 'lucide-react'
+import { LayoutDashboard, AlertTriangle, Sliders, Shield, Database, History as HistoryIcon } from 'lucide-react'
 import Dashboard from './components/Dashboard'
 import Incidents from './components/Incidents'
 import Settings from './components/Settings'
 import History from './components/History'
+import Registry from './components/Registry'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -16,6 +17,8 @@ function App() {
         return <Incidents />
       case 'history':
         return <History />
+      case 'registry':
+        return <Registry />
       case 'settings':
         return <Settings />
       default:
@@ -59,6 +62,15 @@ function App() {
               >
                 <HistoryIcon size={18} />
                 History
+              </button>
+            </li>
+            <li className="nav-item">
+              <button 
+                onClick={() => setActiveTab('registry')} 
+                className={`nav-button ${activeTab === 'registry' ? 'active' : ''}`}
+              >
+                <Database size={18} />
+                Registry
               </button>
             </li>
             <li className="nav-item">

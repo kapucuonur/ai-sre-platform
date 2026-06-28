@@ -25,6 +25,9 @@ function History() {
   }, [])
 
   const getDuration = (inc) => {
+    if (inc.duration !== undefined && inc.duration !== null) {
+      return `${Number(inc.duration).toFixed(1)}s`
+    }
     if (!inc.created_at || !inc.updated_at || inc.status === 'pending') return '-'
     const start = new Date(inc.created_at)
     const end = new Date(inc.updated_at)

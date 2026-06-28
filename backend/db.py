@@ -35,10 +35,16 @@ def init_db():
                 ai_analysis TEXT,
                 proposed_command TEXT,
                 action_output TEXT,
+                duration REAL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
         """)
+        # Dynamic check/migration to add duration if table was already created without it
+        try:
+            conn.execute("ALTER TABLE incidents ADD COLUMN duration REAL")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
 
 def get_setting(key: str, default: str = "") -> str:
@@ -68,15 +74,15 @@ def get_all_settings() -> dict:
     except Exception:
         return {}
 
-def create_incident(title: str, service: str, alert_payload: dict, logs: str, ai_analysis: str, proposed_command: str) -> int:
+def create_incident(title: str, service: str, alert_payload: dict, logs: str, ai_analysis: str, proposed_command: str, duration: float = None) -> int:
     now = datetime.now().isoformat()
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute(
             """
             INSERT INTO incidents 
-            (status, title, service, alert_payload, logs, ai_analysis, proposed_command, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (status, title, service, alert_payload, logs, ai_analysis, proposed_command, duration, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "pending" if proposed_command else "resolved",
@@ -86,6 +92,7 @@ def create_incident(title: str, service: str, alert_payload: dict, logs: str, ai
                 logs,
                 ai_analysis,
                 proposed_command,
+                duration,
                 now,
                 now
             )
@@ -93,19 +100,31 @@ def create_incident(title: str, service: str, alert_payload: dict, logs: str, ai
         conn.commit()
         return cur.lastrowid
 
-def update_incident_status(incident_id: int, status: str, action_output: str = None):
+def update_incident_status(incident_id: int, status: str, action_output: str = None, duration: float = None):
     now = datetime.now().isoformat()
     with get_db() as conn:
         if action_output is not None:
-            conn.execute(
-                "UPDATE incidents SET status = ?, action_output = ?, updated_at = ? WHERE id = ?",
-                (status, action_output, now, incident_id)
-            )
+            if duration is not None:
+                conn.execute(
+                    "UPDATE incidents SET status = ?, action_output = ?, duration = ?, updated_at = ? WHERE id = ?",
+                    (status, action_output, duration, now, incident_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE incidents SET status = ?, action_output = ?, updated_at = ? WHERE id = ?",
+                    (status, action_output, now, incident_id)
+                )
         else:
-            conn.execute(
-                "UPDATE incidents SET status = ?, updated_at = ? WHERE id = ?",
-                (status, now, incident_id)
-            )
+            if duration is not None:
+                conn.execute(
+                    "UPDATE incidents SET status = ?, duration = ?, updated_at = ? WHERE id = ?",
+                    (status, duration, now, incident_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE incidents SET status = ?, updated_at = ? WHERE id = ?",
+                    (status, now, incident_id)
+                )
         conn.commit()
 
 def get_all_incidents() -> list:

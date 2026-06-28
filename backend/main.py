@@ -42,6 +42,7 @@ class DaemonIncidentModel(BaseModel):
     status: str
     proposed_command: str
     action_output: str
+    duration: Optional[float] = None
 
 # --- Core Webhooks ---
 
@@ -102,11 +103,14 @@ def process_incident(service: str, title: str, logs: str, alert_payload: dict):
         db.update_incident_status(incident_id, "approved")
         
         # Execute the action
+        import time
+        start_time = time.time()
         output = action_service.execute_command(proposed_cmd)
+        duration = time.time() - start_time
         is_success = "Exit Code: 0" in output
         final_status = "resolved" if is_success else "failed"
         
-        db.update_incident_status(incident_id, final_status, output)
+        db.update_incident_status(incident_id, final_status, output, duration=duration)
         
         # Send notification to slack with status
         ai_service.send_to_slack(
@@ -154,11 +158,12 @@ async def receive_daemon_incident(payload: DaemonIncidentModel):
         alert_payload={"source": "daemon"},
         logs=payload.logs,
         ai_analysis="Processed by local Pi 5 SRE Daemon.",
-        proposed_command=payload.proposed_command
+        proposed_command=payload.proposed_command,
+        duration=payload.duration
     )
     # Map status to approved then resolved/failed
     db.update_incident_status(incident_id, "approved")
-    db.update_incident_status(incident_id, payload.status, payload.action_output)
+    db.update_incident_status(incident_id, payload.status, payload.action_output, duration=payload.duration)
     
     # Notify Slack
     ai_service.send_to_slack(
@@ -246,14 +251,17 @@ def run_approved_incident_action(incident_id: int, response_url: str, original_b
     db.update_incident_status(incident_id, "approved")
     
     # Run the remediation command
+    import time
+    start_time = time.time()
     command = incident["proposed_command"]
     output = action_service.execute_command(command)
+    duration = time.time() - start_time
     
     # Check execution success (we flag exit code in output)
     is_success = "Exit Code: 0" in output
     final_status = "resolved" if is_success else "failed"
     
-    db.update_incident_status(incident_id, final_status, output)
+    db.update_incident_status(incident_id, final_status, output, duration=duration)
     
     # Update Slack Card with outcome
     updated_blocks = original_blocks[:-1] # Remove temporary "Running" section
@@ -391,6 +399,42 @@ async def save_settings(payload: SettingsModel):
         db.set_setting("autonomous_mode", "true" if payload.autonomous_mode else "false")
         
     return {"status": "saved"}
+
+# --- Strategy Registry Analytics ---
+@app.get("/api/registry/analytics")
+async def get_registry_analytics():
+    import subprocess
+    import json
+    cmd = [
+        "sshpass", "-p", "pi", 
+        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "PubkeyAuthentication=no", "-o", "PreferredAuthentications=password",
+        "pi@192.168.1.116",
+        "python3 -c 'import sqlite3, json; conn = sqlite3.connect(\"/home/pi/sre/sre_state.db\"); conn.row_factory = sqlite3.Row; print(json.dumps([dict(r) for r in conn.execute(\"SELECT error_hash, command, success_count, fail_count, weight, is_blacklisted, last_used FROM strategy_registry\").fetchall()]))'"
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if res.returncode != 0:
+            logger.warning("SSH to Pi failed: %s", res.stderr)
+            return {"total_strategies": 0, "blacklist_rate": 0.0, "total_savings_tokens": 0, "entries": []}
+        
+        entries = json.loads(res.stdout.strip())
+        total_strategies = len(entries)
+        blacklist_count = sum(1 for e in entries if e.get("is_blacklisted") == 1)
+        blacklist_rate = round((blacklist_count / total_strategies) * 100, 1) if total_strategies > 0 else 0.0
+        
+        # Each successful cache hit saves an LLM query (average input 1000 + output 200 tokens = 1200 tokens)
+        total_success_hits = sum(e.get("success_count", 0) for e in entries)
+        total_savings_tokens = total_success_hits * 1200
+        
+        return {
+            "total_strategies": total_strategies,
+            "blacklist_rate": blacklist_rate,
+            "total_savings_tokens": total_savings_tokens,
+            "entries": entries
+        }
+    except Exception as e:
+        logger.error("Failed to query registry analytics: %s", e)
+        return {"total_strategies": 0, "blacklist_rate": 0.0, "total_savings_tokens": 0, "entries": []}
 
 # --- Health check ---
 @app.get("/health")
