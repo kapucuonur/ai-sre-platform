@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, Header
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -618,6 +620,20 @@ def get_stripe_subscription(session_id: str):
     except Exception as e:
         logger.error("Failed to retrieve subscription: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- Frontend SPA Static serving ---
+frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend_dist")
+
+@app.get("/sre/{path:path}")
+def serve_frontend_spa(path: str):
+    index_path = os.path.join(frontend_dist_path, "index.html")
+    if not path or "." not in path:
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+    raise HTTPException(status_code=404, detail="File not found")
+
+if os.path.exists(frontend_dist_path):
+    app.mount("/sre", StaticFiles(directory=frontend_dist_path, html=True), name="sre")
 
 # --- Health check ---
 @app.get("/health")

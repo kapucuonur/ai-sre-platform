@@ -1,26 +1,16 @@
 services:
-  backend:
+  platform:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
-    container_name: ai-sre-backend
+    container_name: ai-sre-platform
     ports:
       - "8003:8000"
+      - "8080:8000"
     volumes:
       - ./backend/data:/app/data
-      - /var/run/docker.sock:/var/run/docker.sock # Allows managing host docker containers
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PYTHONUNBUFFERED=1
       - SRE_DB_DIR=/app/data
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: ai-sre-frontend
-    ports:
-      - "8080:80"
-    depends_on:
-      - backend
     restart: unless-stopped
