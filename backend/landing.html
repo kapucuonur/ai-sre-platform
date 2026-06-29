@@ -1262,7 +1262,11 @@ const DEMO_LINES = [
   { delay: 6200, html: '' },
   { delay: 6500, html: '<span style="color:#334155">Jun 29 10:31:02</span> <span style="color:#fb923c">[COMPLEX]</span> postgres — replication lag 48s — routing to Claude Sonnet' },
   { delay: 9200, html: '<span style="color:#334155">Jun 29 10:31:09</span> <span style="color:#4ade80">[HEAL]</span> ✓ WAL cleared — registered to registry — <span style="color:#a78bfa">cost: $0.0050</span>' },
-  { delay: 10000, html: '<span style="color:#334155">Jun 29 10:31:09</span> <span style="color:#4ade80">[SUMMARY]</span> 3 incidents resolved · 2 registry hits ($0.00) · 1 LLM call ($0.005)' },
+  { delay: 9800, html: '' },
+  { delay: 10400, html: '<span style="color:#334155">Jun 29 20:16:45</span> <span style="color:#ef4444">[PREDICTIVE]</span> bikefit-api CPU anomaly: 9.1% (EMA 1.0%, limits: 5.0%)' },
+  { delay: 12000, html: '<span style="color:#334155">Jun 29 20:16:55</span> <span style="color:#4ade80">[HEAL]</span> Pre-emptive restart triggered for container: bikefit-api' },
+  { delay: 13500, html: '<span style="color:#334155">Jun 29 20:16:59</span> <span style="color:#4ade80">[HEAL]</span> ✓ Container healthy — service stabilized before outage' },
+  { delay: 14500, html: '<span style="color:#334155">Jun 29 20:17:00</span> <span style="color:#4ade80">[SUMMARY]</span> 4 incidents resolved · 2 registry hits · 1 predictive restart · 1 LLM call' },
 ];
 
 function openDemo() {
