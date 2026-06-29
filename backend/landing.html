@@ -813,14 +813,42 @@ body.light-theme {
   --primary-glow: rgba(6, 182, 212, 0.1);
 }
 body.light-theme .term-body { background: #04070a; }
-body.light-theme .logo { color: var(--text-primary); }
-body.light-theme .logo span { color: var(--primary); }
-body.light-theme .btn-ghost { color: var(--text-primary); border-color: var(--border-color); }
-body.light-theme .btn-ghost:hover { background: rgba(0,0,0,0.02); border-color: rgba(0,0,0,0.2); }
 body.light-theme .plan.featured { border-color: var(--primary); }
 body.light-theme .plan-cta.free { background: rgba(0,0,0,0.02); border-color: var(--border-color); color: var(--text-primary); }
 body.light-theme .plan-cta.free:hover { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.2); }
-body.light-theme .mobile-menu { background: var(--bg-base); }
+body.light-theme .btn-ghost { color: var(--text-primary); border-color: var(--border-color); }
+body.light-theme .btn-ghost:hover { background: rgba(0,0,0,0.02); border-color: rgba(0,0,0,0.2); }
+
+/* Light mode: navbar stays DARK — white text on dark bar */
+body.light-theme .nav {
+  background: rgba(11, 19, 28, 0.96);
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+body.light-theme .logo { color: #f8fafc; }
+body.light-theme .logo span { color: #22d3ee; }
+body.light-theme .nav-links a { color: #f8fafc; }
+body.light-theme .nav-links a:hover { color: #22d3ee; }
+body.light-theme .lang-select {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.12);
+  color: #f8fafc;
+}
+body.light-theme .theme-toggle {
+  border-color: rgba(255,255,255,0.15);
+  color: #f8fafc;
+}
+body.light-theme .theme-toggle:hover { background: rgba(255,255,255,0.08); }
+body.light-theme .hamburger span { background: #f8fafc; }
+
+/* Mobile drawer stays light in light mode (it's below the nav) */
+body.light-theme .mobile-menu {
+  background: #ffffff;
+  border-color: rgba(15,23,42,0.08);
+}
+body.light-theme .mobile-menu a { color: #0f172a; }
+body.light-theme .mobile-menu a:hover { background: rgba(0,0,0,0.04); color: #06b6d4; }
+body.light-theme .mobile-menu-controls { border-color: rgba(15,23,42,0.08); }
+body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border-color: rgba(15,23,42,0.15); }
 
 /* ─── Responsive ───────────────────────────── */
 @media (max-width: 768px) {
