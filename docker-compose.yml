@@ -13,4 +13,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - SRE_DB_DIR=/app/data
+      - STRIPE_SECRET_KEY
+      - STRIPE_WEBHOOK_SECRET
     restart: unless-stopped
