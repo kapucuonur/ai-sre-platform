@@ -56,6 +56,33 @@ def init_db():
                 updated_at TEXT
             )
         """)
+        
+        # Tenant dynamic real-time status table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tenant_status (
+                api_key TEXT PRIMARY KEY,
+                cpu_temp TEXT,
+                memory TEXT,
+                disk TEXT,
+                containers TEXT, -- JSON string of containers
+                updated_at TEXT NOT NULL
+            )
+        """)
+        
+        # Tenant time-series historical metrics table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tenant_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                api_key TEXT NOT NULL,
+                entity TEXT NOT NULL,
+                metric_type TEXT NOT NULL,
+                value REAL NOT NULL,
+                timestamp TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tenant_metrics_ts ON tenant_metrics (timestamp)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tenant_metrics_key ON tenant_metrics (api_key)")
+        
         conn.commit()
 
 def get_setting(key: str, default: str = "") -> str:
@@ -224,6 +251,72 @@ def get_subscription_by_customer(customer_id: str) -> dict:
             return dict(row) if row else None
     except Exception:
         return None
+
+
+
+def save_tenant_status(api_key: str, cpu_temp: str, memory: str, disk: str, containers_json: str) -> None:
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        with get_db() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO tenant_status (api_key, cpu_temp, memory, disk, containers, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (api_key, cpu_temp, memory, disk, containers_json, now)
+            )
+            
+            # Also insert historical data point for host metrics
+            try:
+                cpu_val = float(cpu_temp.replace("%", "").strip())
+                mem_val = float(memory.replace("%", "").strip())
+                conn.execute(
+                    "INSERT INTO tenant_metrics (api_key, entity, metric_type, value, timestamp) VALUES (?, ?, ?, ?, ?)",
+                    (api_key, "host", "cpu", cpu_val, now)
+                )
+                conn.execute(
+                    "INSERT INTO tenant_metrics (api_key, entity, metric_type, value, timestamp) VALUES (?, ?, ?, ?, ?)",
+                    (api_key, "host", "mem", mem_val, now)
+                )
+                
+                # Truncate anything older than 24 hours to keep database clean
+                from datetime import timedelta
+                cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+                conn.execute("DELETE FROM tenant_metrics WHERE timestamp < ?", (cutoff,))
+            except Exception:
+                pass
+                
+            conn.commit()
+    except Exception as e:
+        print(f"Error saving tenant status: {e}")
+
+def get_tenant_status(api_key: str) -> dict:
+    try:
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM tenant_status WHERE api_key = ?", (api_key,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+    except Exception:
+        return None
+
+def get_tenant_metrics_history(api_key: str, entity: str = "host", limit: int = 48) -> list:
+    try:
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT timestamp, metric_type, value FROM tenant_metrics
+                WHERE api_key = ? AND entity = ?
+                ORDER BY timestamp DESC LIMIT ?
+                """,
+                (api_key, entity, limit * 2) # both cpu and mem
+            )
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
+        return []
 
 # Initial database migration
 init_db()

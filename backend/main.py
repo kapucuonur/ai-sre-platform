@@ -48,6 +48,17 @@ class DaemonIncidentModel(BaseModel):
     action_output: str
     duration: Optional[float] = None
 
+class DaemonContainerModel(BaseModel):
+    name: str
+    status: str
+
+class DaemonStatusModel(BaseModel):
+    tenant_id: str
+    cpu_temp: str
+    memory: str
+    disk: str
+    containers: list[DaemonContainerModel]
+
 # --- Core Webhooks ---
 
 @app.post("/api/webhook/grafana")
@@ -187,6 +198,38 @@ async def receive_daemon_incident(payload: DaemonIncidentModel, x_sre_api_key: O
         action_output=payload.action_output
     )
     return {"status": "recorded", "incident_id": incident_id}
+@app.post("/api/daemon/status")
+async def receive_daemon_status(payload: DaemonStatusModel, x_sre_api_key: Optional[str] = Header(None, alias="X-SRE-API-Key")):
+    """
+    Receives periodic hardware and container status reports from client SRE Daemons.
+    """
+    active_keys = db.get_active_api_keys()
+    api_key_to_use = x_sre_api_key or "self-hosted"
+    
+    if active_keys:
+        if not x_sre_api_key or x_sre_api_key not in active_keys:
+            logger.warning("Unauthorized daemon status report attempt.")
+            raise HTTPException(status_code=401, detail="Unauthorized SRE API Key.")
+            
+    containers_json = json.dumps([c.dict() for c in payload.containers])
+    db.save_tenant_status(
+        api_key=api_key_to_use,
+        cpu_temp=payload.cpu_temp,
+        memory=payload.memory,
+        disk=payload.disk,
+        containers_json=containers_json
+    )
+    return {"status": "saved"}
+
+@app.get("/api/metrics/history")
+async def get_metrics_history(x_sre_api_key: Optional[str] = Header(None, alias="X-SRE-API-Key")):
+    """
+    Returns time-series history metrics for the current tenant.
+    """
+    api_key_to_use = x_sre_api_key or "self-hosted"
+    history = db.get_tenant_metrics_history(api_key_to_use, entity="host")
+    return {"history": history}
+
 
 @app.post("/api/webhook/slack/actions")
 async def slack_actions(request: Request, background_tasks: BackgroundTasks):
@@ -291,8 +334,38 @@ def run_approved_incident_action(incident_id: int, response_url: str, original_b
 # --- Web UI REST Endpoints ---
 
 @app.get("/api/status")
-async def get_system_status():
+async def get_system_status(x_sre_api_key: Optional[str] = Header(None, alias="X-SRE-API-Key")):
     """Fetches hardware status metrics and active containers, filtered for privacy."""
+    api_key_to_use = x_sre_api_key or "self-hosted"
+    
+    # Whitelist of containers to show in the public dashboard (excludes private containers)
+    ALLOWED_CONTAINERS = {
+        "ai-sre-platform",
+        "bikefit-api",
+        "bikefit-frontend",
+        "coachonurai-api",
+        "trihonor-api-prod",
+        "trihonor-db-prod",
+        "sre-daemon"
+    }
+
+    # Try to fetch last reported status for this tenant from database
+    tenant_data = db.get_tenant_status(api_key_to_use)
+    if tenant_data:
+        try:
+            raw_containers = json.loads(tenant_data.get("containers", "[]"))
+            filtered_containers = [
+                c for c in raw_containers if c.get("name") in ALLOWED_CONTAINERS
+            ]
+            return {
+                "cpu_temp": tenant_data.get("cpu_temp", "N/A"),
+                "memory": tenant_data.get("memory", "N/A"),
+                "disk": tenant_data.get("disk", "N/A"),
+                "containers": filtered_containers
+            }
+        except Exception:
+            pass
+
     stats = {
         "cpu_temp": "42.8°C",
         "memory": "2.4Gi / 16.0Gi",
