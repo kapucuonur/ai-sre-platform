@@ -664,7 +664,7 @@ body {
   border: 0;
 }
 
-/* TriHonor Back Button */
+/* ─── TriHonor Back Button ─────────────────── */
 .btn-back {
   font-size: 13px;
   font-weight: 600;
@@ -676,6 +676,7 @@ body {
   border-radius: 8px;
   transition: var(--transition);
   font-family: var(--font-mono);
+  white-space: nowrap;
 }
 .btn-back:hover {
   color: var(--text-primary);
@@ -683,7 +684,65 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Theme Toggle Button */
+/* ─── Hamburger ────────────────────────────── */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: var(--transition);
+}
+.hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transition: var(--transition);
+}
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Mobile drawer */
+.mobile-menu {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-color);
+  padding: 16px 20px;
+  z-index: 9;
+}
+.mobile-menu.open { display: flex; }
+.mobile-menu a {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 10px 12px;
+  border-radius: 8px;
+  transition: var(--transition);
+}
+.mobile-menu a:hover { background: rgba(255,255,255,0.04); color: var(--primary); }
+.mobile-menu-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 8px;
+}
+
+/* ─── Theme Toggle ─────────────────────────── */
 .theme-toggle {
   background: transparent;
   border: 1px solid var(--border-color);
@@ -704,7 +763,7 @@ body {
   transform: scale(1.05);
 }
 
-/* Language Dropdown Selector */
+/* ─── Language Select ──────────────────────── */
 .lang-select {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
@@ -718,11 +777,9 @@ body {
   outline: none;
   transition: var(--transition);
 }
-.lang-select:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-}
+.lang-select:hover { border-color: rgba(255, 255, 255, 0.2); }
 
-/* Light Mode Overrides */
+/* ─── Light Mode ───────────────────────────── */
 body.light-theme {
   --bg-base: #f8fafc;
   --bg-surface: #ffffff;
@@ -735,34 +792,72 @@ body.light-theme {
   --primary-hover: #0891b2;
   --primary-glow: rgba(6, 182, 212, 0.1);
 }
-body.light-theme .term-body {
-  background: #04070a; /* Keep terminal dark for classic tech look */
+body.light-theme .term-body { background: #04070a; }
+body.light-theme .logo { color: var(--text-primary); }
+body.light-theme .logo span { color: var(--primary); }
+body.light-theme .btn-ghost { color: var(--text-primary); border-color: var(--border-color); }
+body.light-theme .btn-ghost:hover { background: rgba(0,0,0,0.02); border-color: rgba(0,0,0,0.2); }
+body.light-theme .plan.featured { border-color: var(--primary); }
+body.light-theme .plan-cta.free { background: rgba(0,0,0,0.02); border-color: var(--border-color); color: var(--text-primary); }
+body.light-theme .plan-cta.free:hover { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.2); }
+body.light-theme .mobile-menu { background: var(--bg-base); }
+
+/* ─── Responsive ───────────────────────────── */
+@media (max-width: 768px) {
+  /* Nav */
+  .nav { padding: 16px 20px; position: relative; flex-wrap: wrap; }
+  .nav-links { display: none; }         /* hidden, drawer used instead */
+  .nav-controls { display: none; }      /* hidden, drawer used instead */
+  .hamburger { display: flex; }
+
+  /* Hero */
+  .hero { padding: 72px 20px 48px; }
+  .hero h1 { font-size: clamp(30px, 9vw, 44px); }
+  .hero p { font-size: 15px; }
+  .hero-ctas { flex-direction: column; align-items: stretch; gap: 12px; }
+  .btn-primary, .btn-ghost { padding: 14px 20px; font-size: 15px; width: 100%; }
+
+  /* Terminal */
+  .terminal { margin: 32px 20px 0; }
+  .term-body { font-size: 11px; padding: 16px; overflow-x: auto; white-space: nowrap; }
+
+  /* Sections */
+  .section { padding: 64px 20px; }
+  .section-title { font-size: clamp(22px, 6vw, 32px); margin-bottom: 32px; }
+
+  /* How grid: 1 column */
+  .how-grid { grid-template-columns: 1fr; gap: 12px; }
+
+  /* Stats: 2 columns */
+  .stats { grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 48px; }
+  .stat-num { font-size: 28px; }
+
+  /* Pricing: 1 column */
+  .pricing { grid-template-columns: 1fr; gap: 20px; }
+  .plan { padding: 28px 20px; }
+  .plan-price { font-size: 36px; }
+
+  /* Compat tags */
+  .compat { gap: 8px; }
+  .compat-tag { font-size: 12px; padding: 6px 12px; }
+
+  /* FAQ */
+  .faq-q { font-size: 14px; }
+  .faq-a { font-size: 13px; }
+
+  /* Footer */
+  .footer { flex-direction: column; align-items: flex-start; padding: 28px 20px; gap: 16px; }
+
+  /* Demo modal */
+  #demoModal > div { width: 95%; max-height: 90vh; overflow-y: auto; }
+  #demoLog { min-height: 180px; font-size: 11px; white-space: nowrap; overflow-x: auto; }
 }
-body.light-theme .logo {
-  color: var(--text-primary);
-}
-body.light-theme .logo span {
-  color: var(--primary);
-}
-body.light-theme .btn-ghost {
-  color: var(--text-primary);
-  border-color: var(--border-color);
-}
-body.light-theme .btn-ghost:hover {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: rgba(0, 0, 0, 0.2);
-}
-body.light-theme .plan.featured {
-  border-color: var(--primary);
-}
-body.light-theme .plan-cta.free {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: var(--border-color);
-  color: var(--text-primary);
-}
-body.light-theme .plan-cta.free:hover {
-  background: rgba(0, 0, 0, 0.06);
-  border-color: rgba(0, 0, 0, 0.2);
+
+@media (max-width: 480px) {
+  .hero h1 { font-size: clamp(26px, 8vw, 36px); }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .plan-badge { font-size: 10px; padding: 3px 10px; }
+  .eyebrow { font-size: 11px; }
 }
 </style>
 </head>
@@ -772,6 +867,8 @@ body.light-theme .plan-cta.free:hover {
 
 <nav class="nav">
   <div class="logo">SRE<span>daemon</span></div>
+
+  <!-- Desktop links -->
   <div class="nav-links">
     <a href="https://trihonor.com" class="btn-back">← TriHonor</a>
     <a href="/dashboard" data-i18n="nav_dashboard">Dashboard</a>
@@ -780,7 +877,9 @@ body.light-theme .plan-cta.free:hover {
     <a href="#faq">FAQ</a>
     <a href="https://github.com/kapucuonur/sre-daemon" target="_blank">GitHub</a>
   </div>
-  <div style="display:flex;align-items:center;gap:10px">
+
+  <!-- Desktop controls -->
+  <div class="nav-controls" style="display:flex;align-items:center;gap:10px;">
     <select class="lang-select" id="langSelect" onchange="setLang(this.value)">
       <option value="en">🇬🇧 EN</option>
       <option value="de">🇩🇪 DE</option>
@@ -793,7 +892,37 @@ body.light-theme .plan-cta.free:hover {
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
     <button class="nav-cta" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')" data-i18n="nav_cta">Start free →</button>
   </div>
+
+  <!-- Mobile: right side controls + hamburger -->
+  <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+    <button class="theme-toggle" id="themeToggleMobile" onclick="toggleTheme()" title="Toggle theme" style="display:none;">🌙</button>
+    <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
 </nav>
+
+<!-- Mobile drawer -->
+<div class="mobile-menu" id="mobileMenu">
+  <a href="https://trihonor.com">← TriHonor</a>
+  <a href="/dashboard" data-i18n="nav_dashboard" onclick="closeMenu()">Dashboard</a>
+  <a href="#how-it-works" data-i18n="nav_how" onclick="closeMenu()">How it works</a>
+  <a href="#pricing" data-i18n="nav_pricing" onclick="closeMenu()">Pricing</a>
+  <a href="#faq" onclick="closeMenu()">FAQ</a>
+  <a href="https://github.com/kapucuonur/sre-daemon" target="_blank">GitHub</a>
+  <div class="mobile-menu-controls">
+    <select class="lang-select" id="langSelectMobile" onchange="setLang(this.value);closeMenu()" style="flex:1;">
+      <option value="en">🇬🇧 EN</option>
+      <option value="de">🇩🇪 DE</option>
+      <option value="it">🇮🇹 IT</option>
+      <option value="ru">🇷🇺 RU</option>
+      <option value="tr">🇹🇷 TR</option>
+      <option value="es">🇪🇸 ES</option>
+      <option value="sv">🇸🇪 SV</option>
+    </select>
+    <button class="nav-cta" onclick="closeMenu();sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')" style="white-space:nowrap;">Start free →</button>
+  </div>
+</div>
 
 <div class="hero">
   <div class="eyebrow"><span class="dot"></span>NOW IN BETA</div>
@@ -1088,17 +1217,45 @@ function closeDemo() {
   document.getElementById('demoModal').style.display = 'none';
 }
 
-// ── Theme Toggle ──
+// ── Hamburger Menu ──
+function toggleMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const btn  = document.getElementById('hamburger');
+  const open = menu.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+function closeMenu() {
+  document.getElementById('mobileMenu').classList.remove('open');
+  document.getElementById('hamburger').classList.remove('open');
+}
+// Close drawer when clicking outside
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('mobileMenu');
+  const btn  = document.getElementById('hamburger');
+  if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu();
+});
+
+// ── Theme Toggle (syncs desktop + mobile) ──
+function updateThemeIcons(isLight) {
+  const icon = isLight ? '☀️' : '🌙';
+  ['themeToggle', 'themeToggleMobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = icon;
+  });
+}
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light-theme');
-  document.getElementById('themeToggle').textContent = isLight ? '☀️' : '🌙';
   localStorage.setItem('sre_theme', isLight ? 'light' : 'dark');
+  updateThemeIcons(isLight);
 }
 (function() {
   if (localStorage.getItem('sre_theme') === 'light') {
     document.body.classList.add('light-theme');
-    document.getElementById('themeToggle').textContent = '☀️';
+    updateThemeIcons(true);
   }
+  // Show mobile theme button only on mobile
+  const mobileBtn = document.getElementById('themeToggleMobile');
+  if (mobileBtn && window.innerWidth <= 768) mobileBtn.style.display = 'flex';
 })();
 
 // ── i18n Translations ──
@@ -1182,7 +1339,6 @@ function setLang(lang) {
     const key = el.getAttribute('data-i18n');
     if (t[key]) el.textContent = t[key];
   });
-  // Update hero separately (h1 has two parts)
   const heroH1 = document.querySelector('.hero h1');
   if (heroH1) heroH1.innerHTML = t.hero_h1 + '<br><em>' + t.hero_h1_em + '</em>';
   const heroP = document.querySelector('.hero p');
@@ -1191,14 +1347,17 @@ function setLang(lang) {
   if (btnStart) btnStart.textContent = t.btn_start;
   const btnDemo = document.querySelector('.btn-ghost');
   if (btnDemo) btnDemo.textContent = t.btn_demo;
-  // section labels
   const labels = document.querySelectorAll('.section-label');
   const titles = document.querySelectorAll('.section-title');
   const labelMap = [t.how_label, null, t.pricing_label, t.faq_label];
   const titleMap = [t.how_title, null, t.pricing_title, t.faq_title];
   labels.forEach((el, i) => { if (labelMap[i]) el.textContent = labelMap[i]; });
   titles.forEach((el, i) => { if (titleMap[i]) el.textContent = titleMap[i]; });
-  document.getElementById('langSelect').value = lang;
+  // Sync both selectors
+  ['langSelect', 'langSelectMobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = lang;
+  });
 }
 
 (function() {
