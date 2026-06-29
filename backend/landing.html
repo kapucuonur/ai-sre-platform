@@ -801,7 +801,33 @@ body.light-theme .plan-cta.free:hover {
   <p>An autonomous SRE agent that watches your Linux servers, learns from every incident, and fixes problems without waking you up — on any VPS, bare metal, or cloud VM.</p>
   <div class="hero-ctas">
     <button class="btn-primary" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')">Get started free →</button>
-    <button class="btn-ghost" onclick="sendPrompt('Demo video script yaz, 2 dakika, gerçek Pi log scrollu ile')">Watch demo</button>
+    <button class="btn-ghost" onclick="openDemo()">Watch demo</button>
+  </div>
+</div>
+
+<!-- Demo Modal -->
+<div id="demoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:16px;max-width:760px;width:90%;padding:0;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,0.6);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border-color);">
+      <span style="font-family:var(--font-heading);font-size:16px;font-weight:700;color:var(--text-primary);">🎬 SRE Daemon — Live Demo</span>
+      <button onclick="closeDemo()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div style="padding:24px;">
+      <div style="background:#04070a;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex;gap:8px;padding:12px 16px;background:rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div style="width:12px;height:12px;border-radius:50%;background:#ff5f57;"></div>
+          <div style="width:12px;height:12px;border-radius:50%;background:#febc2e;"></div>
+          <div style="width:12px;height:12px;border-radius:50%;background:#28c840;"></div>
+          <span style="flex:1;text-align:center;font-family:var(--font-mono);font-size:11px;color:#475569;">trihonor — sre-daemon live</span>
+        </div>
+        <div id="demoLog" style="padding:20px 24px;font-family:var(--font-mono);font-size:13px;line-height:2;min-height:280px;"></div>
+      </div>
+      <p style="margin-top:16px;font-size:13px;color:var(--text-secondary);text-align:center;">This is a live simulation of SRE Daemon autonomously healing your infrastructure — zero human intervention.</p>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;">
+        <button class="btn-primary" onclick="closeDemo();sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')">Start free trial →</button>
+        <button class="btn-ghost" onclick="closeDemo()">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1019,6 +1045,47 @@ function sendPrompt(action) {
 
 function openLink(url) {
   window.open(url, '_blank');
+}
+
+// ── Demo Modal ──
+const DEMO_LINES = [
+  { delay: 0,    html: '<span style="color:#334155">Jun 29 10:07:51</span> <span style="color:#38bdf8">[DOCKER]</span> coachonurai exited — OOMKilled (exit 137)' },
+  { delay: 600,  html: '<span style="color:#334155">Jun 29 10:07:51</span> <span style="color:#a78bfa">[REGISTRY HIT]</span> hash=<span style="color:#a78bfa">a1b2c3d4</span> — cached strategy found' },
+  { delay: 1100, html: '<span style="color:#334155">Jun 29 10:07:51</span> <span style="color:#4ade80">[HEAL]</span> Executing: <span style="color:#a78bfa">docker restart coachonurai</span>' },
+  { delay: 2800, html: '<span style="color:#334155">Jun 29 10:07:54</span> <span style="color:#4ade80">[HEAL]</span> ✓ Container healthy — <span style="color:#a78bfa">LLM cost: $0.0000</span>' },
+  { delay: 3400, html: '' },
+  { delay: 3600, html: '<span style="color:#334155">Jun 29 10:22:44</span> <span style="color:#38bdf8">[DOCKER]</span> bikefitai exited — OOMKilled (exit 137)' },
+  { delay: 4000, html: '<span style="color:#334155">Jun 29 10:22:44</span> <span style="color:#a78bfa">[REGISTRY HIT]</span> hash=<span style="color:#a78bfa">a1b2c3d4</span> — <span style="color:#4ade80">generalized from coachonurai</span>' },
+  { delay: 4400, html: '<span style="color:#334155">Jun 29 10:22:44</span> <span style="color:#4ade80">[HEAL]</span> Executing: <span style="color:#a78bfa">docker restart bikefitai</span>' },
+  { delay: 5600, html: '<span style="color:#334155">Jun 29 10:22:47</span> <span style="color:#4ade80">[HEAL]</span> ✓ Container healthy — <span style="color:#a78bfa">LLM cost: $0.0000</span>' },
+  { delay: 6200, html: '' },
+  { delay: 6500, html: '<span style="color:#334155">Jun 29 10:31:02</span> <span style="color:#fb923c">[COMPLEX]</span> postgres — replication lag 48s — routing to Claude Sonnet' },
+  { delay: 9200, html: '<span style="color:#334155">Jun 29 10:31:09</span> <span style="color:#4ade80">[HEAL]</span> ✓ WAL cleared — registered to registry — <span style="color:#a78bfa">cost: $0.0050</span>' },
+  { delay: 10000, html: '<span style="color:#334155">Jun 29 10:31:09</span> <span style="color:#4ade80">[SUMMARY]</span> 3 incidents resolved · 2 registry hits ($0.00) · 1 LLM call ($0.005)' },
+];
+
+function openDemo() {
+  const modal = document.getElementById('demoModal');
+  const log = document.getElementById('demoLog');
+  modal.style.display = 'flex';
+  log.innerHTML = '';
+  DEMO_LINES.forEach(({delay, html}) => {
+    setTimeout(() => {
+      if (!modal.style.display || modal.style.display === 'none') return;
+      if (html === '') { log.innerHTML += '<br>'; return; }
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      div.style.opacity = '0';
+      div.style.transition = 'opacity 0.3s';
+      log.appendChild(div);
+      requestAnimationFrame(() => { div.style.opacity = '1'; });
+      log.scrollTop = log.scrollHeight;
+    }, delay);
+  });
+}
+
+function closeDemo() {
+  document.getElementById('demoModal').style.display = 'none';
 }
 
 // ── Theme Toggle ──
