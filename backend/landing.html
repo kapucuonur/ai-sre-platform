@@ -1138,7 +1138,7 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
         <li>Email support (48h)</li>
         <li class="no">Custom LLM routing</li>
       </ul>
-      <button class="plan-cta pro" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')">Start 14-day trial →</button>
+      <button class="plan-cta pro" onclick="checkout('pro')">Start 14-day trial →</button>
     </div>
 
     <div class="plan">
@@ -1155,7 +1155,7 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
         <li>Slack support channel</li>
         <li>SLA 99.9% uptime</li>
       </ul>
-      <button class="plan-cta ent" onclick="sendPrompt('Scale plan için sales email taslağı yaz')">Talk to us →</button>
+      <button class="plan-cta ent" onclick="checkout('scale')">Get Scale Plan →</button>
     </div>
   </div>
 </div>
@@ -1187,6 +1187,26 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
   </div>
 </div>
 
+<!-- Checkout Modal -->
+<div id="checkout-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#0f172a;border:1px solid #334155;border-radius:20px;padding:40px;width:100%;max-width:440px;box-shadow:0 0 60px rgba(168,139,250,0.2);position:relative;">
+    <button onclick="closeCheckoutModal()" style="position:absolute;top:16px;right:20px;background:none;border:none;color:#64748b;font-size:22px;cursor:pointer;line-height:1;">×</button>
+    <div style="color:#a78bfa;font-size:12px;font-weight:700;letter-spacing:2px;margin-bottom:8px;">SECURE CHECKOUT</div>
+    <h3 id="checkout-title" style="font-size:22px;font-weight:700;color:#f1f5f9;margin:0 0 8px 0;">Start your 14-day Pro trial</h3>
+    <p style="color:#94a3b8;font-size:14px;margin:0 0 24px 0;">No credit card required during trial. Cancel anytime.</p>
+    <label style="display:block;color:#94a3b8;font-size:13px;font-weight:600;margin-bottom:6px;">Work email</label>
+    <input id="checkout-email" type="email" placeholder="you@company.com"
+      onkeydown="if(event.key==='Enter')submitCheckout()"
+      style="width:100%;box-sizing:border-box;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px 16px;font-size:15px;color:#f1f5f9;outline:none;margin-bottom:8px;font-family:inherit;" />
+    <div id="checkout-error" style="color:#f87171;font-size:13px;margin-bottom:12px;min-height:18px;"></div>
+    <button id="checkout-submit-btn" onclick="submitCheckout()"
+      style="width:100%;background:linear-gradient(135deg,#7c3aed,#a78bfa);border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;letter-spacing:0.5px;transition:opacity 0.2s;">
+      Continue to payment →
+    </button>
+    <p style="color:#475569;font-size:12px;text-align:center;margin:16px 0 0 0;">🔒 Secured by Stripe · TriHonor Oy · Tampere, Finland</p>
+  </div>
+</div>
+
 <footer class="footer">
   <div class="footer-left">© 2026 TriHonor Oy · Tampere, Finland</div>
   <div class="footer-links">
@@ -1206,41 +1226,54 @@ document.getElementById('faq').addEventListener('click',function(e){
   if(!wasOpen)item.classList.add('open');
 });
 
-function sendPrompt(action) {
-  if (action.includes('Stripe') || action.includes('onboarding') || action.includes('trial')) {
-    const email = prompt("Please enter your email to start your 14-day Pro trial:", "user@example.com");
-    if (!email) return;
-    
-    fetch('/api/stripe/checkout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        plan: 'pro',
-        email: email
-      })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data && data.url) {
-        window.location.href = data.url;
-      } else {
-        alert("Failed to start checkout. Check if SRE Platform API is running.");
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      alert("Error starting checkout: " + err.message);
-    });
-  } else if (action.includes('Scale') || action.includes('Talk to us')) {
-    const email = prompt("Please enter your email and our SRE sales team will reach out to you:", "enterprise@example.com");
-    if (email) {
-      alert("Thanks! We will contact you at " + email + " shortly.");
-    }
-  } else {
-    alert("Triggered action: " + action);
+// ── Stripe Checkout ──
+function checkout(plan) {
+  var modal = document.getElementById('checkout-modal');
+  modal.dataset.plan = plan;
+  document.getElementById('checkout-email').value = '';
+  var title = plan === 'pro' ? 'Start your 14-day Pro trial' : 'Get Scale Plan';
+  document.getElementById('checkout-title').textContent = title;
+  modal.style.display = 'flex';
+  setTimeout(function(){ document.getElementById('checkout-email').focus(); }, 100);
+}
+
+function closeCheckoutModal() {
+  document.getElementById('checkout-modal').style.display = 'none';
+}
+
+function submitCheckout() {
+  var email = document.getElementById('checkout-email').value.trim();
+  if (!email || !email.includes('@')) {
+    document.getElementById('checkout-error').textContent = 'Please enter a valid email address.';
+    return;
   }
+  var plan = document.getElementById('checkout-modal').dataset.plan || 'pro';
+  var btn = document.getElementById('checkout-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Redirecting to Stripe…';
+  document.getElementById('checkout-error').textContent = '';
+
+  fetch('/api/stripe/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan: plan, email: email })
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    if (data && data.url) {
+      window.location.href = data.url;
+    } else {
+      document.getElementById('checkout-error').textContent = 'Could not start checkout. Please try again.';
+      btn.disabled = false;
+      btn.textContent = 'Continue to payment →';
+    }
+  })
+  .catch(function(err){
+    console.error(err);
+    document.getElementById('checkout-error').textContent = 'Network error: ' + err.message;
+    btn.disabled = false;
+    btn.textContent = 'Continue to payment →';
+  });
 }
 
 function openLink(url) {
