@@ -15,4 +15,6 @@ services:
       - SRE_DB_DIR=/app/data
       - STRIPE_SECRET_KEY
       - STRIPE_WEBHOOK_SECRET
+      - STRIPE_PRICE_PRO
+      - STRIPE_PRICE_SCALE
     restart: unless-stopped
