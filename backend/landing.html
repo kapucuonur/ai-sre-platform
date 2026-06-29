@@ -1033,7 +1033,8 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
     <div><span class="t-muted">Jun 28 20:07:51</span> <span class="t-ok">[HEAL]</span> Executing: <span class="t-val">docker restart coachonurai</span></div>
     <div><span class="t-muted">Jun 28 20:07:54</span> <span class="t-ok">[HEAL]</span> ✓ Container healthy — <span class="t-val">LLM cost: $0.0000</span></div>
     <div style="margin-top:8px"><span class="t-muted">Jun 28 20:22:44</span> <span class="t-cmd">[DOCKER]</span> bikefitai exited — OOMKilled (exit 137)</div>
-    <div><span class="t-muted">Jun 28 20:22:44</span> <span class="t-cmd">[REGISTRY HIT]</span> <span class="t-val">hash=a1b2c3d4</span> — generalized from coachonurai</div>
+    <div><span class="t-muted">Jun 28 20:22:44</span> <span class="t-cmd" style="color:#facc15">[SEMANTIC HIT]</span> <span class="t-val">similarity=87%</span> — generalized from coachonurai (difflib)</div>
+    <div><span class="t-muted">Jun 28 20:22:44</span> <span class="t-ok">[MANIFEST]</span> service=<span class="t-val">bikefitai</span> runtime=docker-compose → rebuild triggered</div>
     <div><span class="t-muted">Jun 28 20:22:47</span> <span class="t-ok">[HEAL]</span> ✓ Container healthy — <span class="t-val">LLM cost: $0.0000</span></div>
     <div style="margin-top:8px"><span class="t-muted">Jun 28 20:31:02</span> <span class="t-warn">[COMPLEX]</span> postgres — replication lag 48s — routing to Claude Sonnet</div>
     <div><span class="t-muted">Jun 28 20:31:09</span> <span class="t-ok">[HEAL]</span> ✓ WAL cleared — registered to registry — <span class="t-val">cost: $0.0050</span></div>
@@ -1043,7 +1044,10 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
 
 <div class="section" id="how-it-works">
   <div class="section-label">How it works</div>
-  <div class="section-title">Three layers of autonomous healing</div>
+  <div class="section-title">Five layers of autonomous healing</div>
+  <!-- Layer 4 & 5 added: Semantic Memory + Auto-Rebuild -->
+  <!-- Layer 4: Semantic similarity via difflib SequenceMatcher (>82% match = cached fix) -->
+  <!-- Layer 5: RebuildManager — docker-compose / systemd / PM2 / Kubernetes after patch -->
   <div class="how-grid">
     <div class="how-step">
       <div class="how-icon">🧠</div>
@@ -1077,7 +1081,10 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
     <span class="compat-tag ready">✓ DigitalOcean VPS</span>
     <span class="compat-tag ready">✓ AWS EC2</span>
     <span class="compat-tag ready">✓ Docker / systemd</span>
-    <span class="compat-tag soon">◎ Kubernetes — Q3 2026</span>
+    <span class="compat-tag ready">✓ PM2 / Node.js</span>
+    <span class="compat-tag ready">✓ Kubernetes (kubectl rollout)</span>
+    <span class="compat-tag ready">✓ PM2 / Node.js</span>
+    <span class="compat-tag ready">✓ Kubernetes (kubectl rollout)</span>
     <span class="compat-tag soon">◎ Web / API uptime — Q4 2026</span>
     <span class="compat-tag soon">◎ Security anomaly detection — 2027</span>
   </div>
@@ -1170,7 +1177,7 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
     </div>
     <div class="faq-item">
       <div class="faq-q">What's the roadmap after Linux? <span>+</span></div>
-      <div class="faq-a">Kubernetes pod monitoring in Q3 2026, HTTP/API uptime checks in Q4 2026, and a security anomaly detection module planned for 2027 as a separate product line.</div>
+      <div class="faq-a">Kubernetes deployment rollout restarts are already supported today via <code>RebuildManager</code>. HTTP/API uptime checks are in Q4 2026, and a security anomaly detection module is planned for 2027 as a separate product line.</div>
     </div>
   </div>
 </div>
@@ -1243,7 +1250,8 @@ const DEMO_LINES = [
   { delay: 2800, html: '<span style="color:#334155">Jun 29 10:07:54</span> <span style="color:#4ade80">[HEAL]</span> ✓ Container healthy — <span style="color:#a78bfa">LLM cost: $0.0000</span>' },
   { delay: 3400, html: '' },
   { delay: 3600, html: '<span style="color:#334155">Jun 29 10:22:44</span> <span style="color:#38bdf8">[DOCKER]</span> bikefitai exited — OOMKilled (exit 137)' },
-  { delay: 4000, html: '<span style="color:#334155">Jun 29 10:22:44</span> <span style="color:#a78bfa">[REGISTRY HIT]</span> hash=<span style="color:#a78bfa">a1b2c3d4</span> — <span style="color:#4ade80">generalized from coachonurai</span>' },
+  { delay: 4000, html: '<span style="color:#334155">Jun 29 10:22:44</span> <span style="color:#facc15">[SEMANTIC HIT]</span> similarity=<span style="color:#a78bfa">87%</span> — <span style="color:#4ade80">generalized from coachonurai (difflib match)</span>' },
+  { delay: 4200, html: '<span style="color:#334155">Jun 29 10:22:44</span> <span style="color:#4ade80">[MANIFEST]</span> service=<span style="color:#a78bfa">bikefitai</span> runtime=<span style="color:#4ade80">docker-compose</span> → auto-rebuild triggered' },
   { delay: 4400, html: '<span style="color:#334155">Jun 29 10:22:44</span> <span style="color:#4ade80">[HEAL]</span> Executing: <span style="color:#a78bfa">docker restart bikefitai</span>' },
   { delay: 5600, html: '<span style="color:#334155">Jun 29 10:22:47</span> <span style="color:#4ade80">[HEAL]</span> ✓ Container healthy — <span style="color:#a78bfa">LLM cost: $0.0000</span>' },
   { delay: 6200, html: '' },
@@ -1325,7 +1333,7 @@ const TRANSLATIONS = {
     hero_h1: 'Your infrastructure,', hero_h1_em: 'healed before you notice.',
     hero_p: 'An autonomous SRE agent that watches your Linux servers, learns from every incident, and fixes problems without waking you up — on any VPS, bare metal, or cloud VM.',
     btn_start: 'Get started free →', btn_demo: 'Watch demo',
-    how_label: 'How it works', how_title: 'Three layers of autonomous healing',
+    how_label: 'How it works', how_title: 'Five layers of autonomous healing',
     pricing_label: 'Pricing', pricing_title: 'One agent, pay as you grow',
     faq_label: 'FAQ', faq_title: 'Common questions'
   },
