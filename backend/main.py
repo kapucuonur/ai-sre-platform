@@ -520,7 +520,7 @@ stripe.api_key = STRIPE_SECRET_KEY
 async def stripe_checkout(payload: CheckoutModel):
     if STRIPE_SECRET_KEY == "sk_test_mock":
         mock_session_id = f"cs_test_{secrets.token_hex(16)}"
-        success_url = f"http://localhost:5173/payment-success?session_id={mock_session_id}&plan={payload.plan}&email={payload.email}"
+        success_url = f"https://sre.trihonor.com/payment-success?session_id={mock_session_id}&plan={payload.plan}&email={payload.email}"
         return {"url": success_url, "simulated": True}
         
     try:
@@ -546,8 +546,8 @@ async def stripe_checkout(payload: CheckoutModel):
                 }
             ],
             mode="subscription",
-            success_url="http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url="http://localhost:5173/pricing",
+            success_url="https://sre.trihonor.com/payment-success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url="https://sre.trihonor.com/#pricing",
             metadata={
                 "plan": payload.plan,
                 "email": payload.email
@@ -691,6 +691,21 @@ def serve_landing():
     if os.path.exists(landing_page_path):
         return FileResponse(landing_page_path)
     raise HTTPException(status_code=404, detail="Landing page not found")
+
+@app.get("/payment-success")
+def serve_payment_success():
+    success_page = os.path.join(os.path.dirname(__file__), "payment_success.html")
+    if os.path.exists(success_page):
+        return FileResponse(success_page)
+    # fallback: simple inline response
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse("""
+    <html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#070d1a;color:#f1f5f9">
+    <h1 style="color:#4ade80">✓ Payment Successful!</h1>
+    <p>Check your email for your API key and installation instructions.</p>
+    <a href="/" style="color:#a78bfa">← Back to home</a>
+    </body></html>
+    """)
 
 # --- React Dashboard SPA at /dashboard/ ---
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend_dist")

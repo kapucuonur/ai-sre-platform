@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Successful — SRE Daemon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #070d1a;
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 24px;
+      padding: 56px 48px;
+      max-width: 520px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 0 80px rgba(124, 58, 237, 0.15);
+      animation: fadeUp 0.6s ease forwards;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .icon-wrap {
+      width: 80px; height: 80px;
+      background: linear-gradient(135deg, #16a34a22, #4ade8033);
+      border: 2px solid #4ade80;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 36px;
+    }
+    .label {
+      color: #a78bfa;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 30px;
+      font-weight: 800;
+      color: #f1f5f9;
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+    .sub {
+      color: #94a3b8;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+    .steps {
+      background: #1e293b;
+      border-radius: 14px;
+      padding: 20px 24px;
+      text-align: left;
+      margin-bottom: 28px;
+    }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid #334155;
+      font-size: 14px;
+      color: #cbd5e1;
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      min-width: 24px; height: 24px;
+      background: #a78bfa22;
+      border: 1px solid #a78bfa;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #a78bfa;
+      margin-top: 1px;
+    }
+    .step strong { color: #f1f5f9; display: block; margin-bottom: 2px; }
+    .btn-primary {
+      display: inline-block;
+      background: linear-gradient(135deg, #7c3aed, #a78bfa);
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 14px 32px;
+      border-radius: 10px;
+      text-decoration: none;
+      transition: opacity 0.2s;
+      margin-bottom: 12px;
+      width: 100%;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-ghost {
+      display: inline-block;
+      color: #64748b;
+      font-size: 13px;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .btn-ghost:hover { color: #94a3b8; }
+    .meta {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid #1e293b;
+      font-size: 12px;
+      color: #475569;
+    }
+    .plan-badge {
+      display: inline-block;
+      background: #7c3aed22;
+      border: 1px solid #7c3aed;
+      color: #a78bfa;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-wrap">✓</div>
+    <div class="label">Payment Successful</div>
+    <div id="plan-badge" class="plan-badge">Pro Plan</div>
+    <h1>Welcome to SRE Daemon!</h1>
+    <p class="sub">Your subscription is active. Your API key and onboarding instructions have been sent to <strong id="email-display">your email</strong>.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div><strong>Check your email</strong>Your API key (sre_live_…) and install script are in your inbox.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div><strong>Run the install script on your server</strong><code style="color:#a78bfa;font-size:12px;">curl -sSL https://sre.trihonor.com/install.sh | bash</code></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div><strong>Open your dashboard</strong>Monitor your infrastructure healing in real-time.</div>
+      </div>
+    </div>
+
+    <a href="https://sre.trihonor.com/dashboard" class="btn-primary">Open Dashboard →</a>
+    <br/>
+    <a href="https://sre.trihonor.com/" class="btn-ghost">← Back to home</a>
+
+    <div class="meta">
+      🔒 Secured by Stripe · TriHonor Oy · Tampere, Finland<br/>
+      Questions? <a href="mailto:support@trihonor.com" style="color:#64748b;">support@trihonor.com</a>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get('email');
+    const plan  = params.get('plan');
+    if (email) {
+      document.getElementById('email-display').textContent = email;
+    }
+    if (plan) {
+      var badge = document.getElementById('plan-badge');
+      badge.textContent = plan.charAt(0).toUpperCase() + plan.slice(1) + ' Plan';
+    }
+  </script>
+</body>
+</html>
