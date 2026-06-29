@@ -95,6 +95,15 @@ function App() {
                 Settings
               </button>
             </li>
+            <li className="nav-item" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '15px' }}>
+              <a 
+                href="/" 
+                className="nav-button"
+                style={{ textDecoration: 'none', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <span>←</span> Back to Home
+              </a>
+            </li>
           </ul>
         </nav>
       </aside>

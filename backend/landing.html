@@ -45,17 +45,24 @@ body {
 }
 
 .nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 40px;
-  border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   background: rgba(6, 10, 15, 0.85);
   backdrop-filter: blur(12px);
   z-index: 10;
   transition: var(--transition);
+  border-bottom: 1px solid var(--border-color);
+  width: 100%;
+}
+
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 40px;
 }
 
 .logo {
@@ -64,6 +71,8 @@ body {
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .logo span {
@@ -853,7 +862,7 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
 /* ─── Responsive ───────────────────────────── */
 @media (max-width: 768px) {
   /* Nav */
-  .nav { padding: 16px 20px; position: relative; flex-wrap: wrap; }
+  .nav-container { padding: 16px 20px; flex-wrap: wrap; }
   .nav-links { display: none; }         /* hidden, drawer used instead */
   .nav-controls { display: none; }      /* hidden, drawer used instead */
   .hamburger { display: flex; }
@@ -914,39 +923,41 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
 <h2 class="sr-only">SRE Daemon — autonomous infrastructure healing service landing page</h2>
 
 <nav class="nav">
-  <div class="logo">SRE<span>daemon</span></div>
+  <div class="nav-container">
+    <a href="/" class="logo">SRE<span>daemon</span></a>
 
-  <!-- Desktop links -->
-  <div class="nav-links">
-    <a href="https://trihonor.com" class="btn-back">← TriHonor</a>
-    <a href="/dashboard" data-i18n="nav_dashboard">Dashboard</a>
-    <a href="#how-it-works" data-i18n="nav_how">How it works</a>
-    <a href="#pricing" data-i18n="nav_pricing">Pricing</a>
-    <a href="#faq">FAQ</a>
-    <a href="https://github.com/kapucuonur/sre-daemon" target="_blank">GitHub</a>
-  </div>
+    <!-- Desktop links -->
+    <div class="nav-links">
+      <a href="https://trihonor.com" class="btn-back">← TriHonor</a>
+      <a href="/dashboard" data-i18n="nav_dashboard">Dashboard</a>
+      <a href="#how-it-works" data-i18n="nav_how">How it works</a>
+      <a href="#pricing" data-i18n="nav_pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/kapucuonur/sre-daemon" target="_blank">GitHub</a>
+    </div>
 
-  <!-- Desktop controls -->
-  <div class="nav-controls" style="display:flex;align-items:center;gap:10px;">
-    <select class="lang-select" id="langSelect" onchange="setLang(this.value)">
-      <option value="en">🇬🇧 EN</option>
-      <option value="de">🇩🇪 DE</option>
-      <option value="it">🇮🇹 IT</option>
-      <option value="ru">🇷🇺 RU</option>
-      <option value="tr">🇹🇷 TR</option>
-      <option value="es">🇪🇸 ES</option>
-      <option value="sv">🇸🇪 SV</option>
-    </select>
-    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-    <button class="nav-cta" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')" data-i18n="nav_cta">Start free →</button>
-  </div>
+    <!-- Desktop controls -->
+    <div class="nav-controls" style="display:flex;align-items:center;gap:10px;">
+      <select class="lang-select" id="langSelect" onchange="setLang(this.value)">
+        <option value="en">🇬🇧 EN</option>
+        <option value="de">🇩🇪 DE</option>
+        <option value="it">🇮🇹 IT</option>
+        <option value="ru">🇷🇺 RU</option>
+        <option value="tr">🇹🇷 TR</option>
+        <option value="es">🇪🇸 ES</option>
+        <option value="sv">🇸🇪 SV</option>
+      </select>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+      <button class="nav-cta" onclick="sendPrompt('Stripe ödeme akışını ve onboarding emailini hazırla')" data-i18n="nav_cta">Start free →</button>
+    </div>
 
-  <!-- Mobile: right side controls + hamburger -->
-  <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
-    <button class="theme-toggle" id="themeToggleMobile" onclick="toggleTheme()" title="Toggle theme" style="display:none;">🌙</button>
-    <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
+    <!-- Mobile: right side controls + hamburger -->
+    <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+      <button class="theme-toggle" id="themeToggleMobile" onclick="toggleTheme()" title="Toggle theme" style="display:none;">🌙</button>
+      <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </div>
 </nav>
 
