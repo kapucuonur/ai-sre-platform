@@ -1036,8 +1036,9 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
     <div><span class="t-muted">Jun 28 20:22:44</span> <span class="t-cmd" style="color:#facc15">[SEMANTIC HIT]</span> <span class="t-val">similarity=87%</span> — generalized from coachonurai (difflib)</div>
     <div><span class="t-muted">Jun 28 20:22:44</span> <span class="t-ok">[MANIFEST]</span> service=<span class="t-val">bikefitai</span> runtime=docker-compose → rebuild triggered</div>
     <div><span class="t-muted">Jun 28 20:22:47</span> <span class="t-ok">[HEAL]</span> ✓ Container healthy — <span class="t-val">LLM cost: $0.0000</span></div>
-    <div style="margin-top:8px"><span class="t-muted">Jun 28 20:31:02</span> <span class="t-warn">[COMPLEX]</span> postgres — replication lag 48s — routing to Claude Sonnet</div>
-    <div><span class="t-muted">Jun 28 20:31:09</span> <span class="t-ok">[HEAL]</span> ✓ WAL cleared — registered to registry — <span class="t-val">cost: $0.0050</span></div>
+    <div style="margin-top:8px"><span class="t-muted">Jun 29 20:16:45</span> <span class="t-warn" style="color:#ef4444">[PREDICTIVE]</span> bikefit-api CPU anomaly: 9.1% (EMA 1.0%, limits: 5.0%)</div>
+    <div><span class="t-muted">Jun 29 20:16:55</span> <span class="t-cmd">[HEAL]</span> Pre-emptive restart triggered for container: bikefit-api</div>
+    <div><span class="t-muted">Jun 29 20:16:59</span> <span class="t-ok">[HEAL]</span> ✓ Container healthy — service restored before outage</div>
   </div>
   </div>
 </div>
@@ -1053,6 +1054,11 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
       <div class="how-icon">🧠</div>
       <h3>Strategy registry</h3>
       <p>Remembers every fix that ever worked. Same error on any container? Resolved instantly with zero API cost.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-icon">🔮</div>
+      <h3>Predictive maintenance</h3>
+      <p>Analyzes telemetry trends (CPU/RAM/Disk) using EMA. Restarts leaking or stuck containers *before* they crash.</p>
     </div>
     <div class="how-step">
       <div class="how-icon">⚡</div>
@@ -1083,8 +1089,7 @@ body.light-theme #langSelectMobile { background: #f8fafc; color: #0f172a; border
     <span class="compat-tag ready">✓ Docker / systemd</span>
     <span class="compat-tag ready">✓ PM2 / Node.js</span>
     <span class="compat-tag ready">✓ Kubernetes (kubectl rollout)</span>
-    <span class="compat-tag ready">✓ PM2 / Node.js</span>
-    <span class="compat-tag ready">✓ Kubernetes (kubectl rollout)</span>
+    <span class="compat-tag ready">✓ Predictive Maintenance (EMA)</span>
     <span class="compat-tag soon">◎ Web / API uptime — Q4 2026</span>
     <span class="compat-tag soon">◎ Security anomaly detection — 2027</span>
   </div>
