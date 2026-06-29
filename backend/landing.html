@@ -78,14 +78,33 @@ body {
 
 .nav-links a {
   font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--text-primary);
   text-decoration: none;
   transition: var(--transition);
+  opacity: 0.75;
+  position: relative;
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 2px;
+  transition: width 0.25s ease;
 }
 
 .nav-links a:hover {
   color: var(--primary);
+  opacity: 1;
+}
+
+.nav-links a:hover::after {
+  width: 100%;
 }
 
 .nav-cta {
@@ -725,14 +744,15 @@ body {
 .mobile-menu.open { display: flex; }
 .mobile-menu a {
   font-size: 15px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--text-primary);
   text-decoration: none;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 8px;
   transition: var(--transition);
+  opacity: 0.8;
 }
-.mobile-menu a:hover { background: rgba(255,255,255,0.04); color: var(--primary); }
+.mobile-menu a:hover, .mobile-menu a:active { background: rgba(255,255,255,0.06); color: var(--primary); opacity: 1; }
 .mobile-menu-controls {
   display: flex;
   gap: 10px;
