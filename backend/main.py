@@ -574,6 +574,10 @@ async def stripe_webhook(request: Request):
             event = stripe.Webhook.construct_event(
                 payload, sig_header, STRIPE_WEBHOOK_SECRET
             )
+            if hasattr(event, "to_dict"):
+                event = event.to_dict()
+            else:
+                event = dict(event)
         except stripe.error.SignatureVerificationError as e:
             logger.error("Webhook signature verification failed: %s", e)
             raise HTTPException(status_code=400, detail="Invalid signature.")

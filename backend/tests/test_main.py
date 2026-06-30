@@ -211,3 +211,74 @@ def test_daemon_incident_auth_check():
     assert response.status_code == 200
     assert response.json()["status"] == "recorded"
 
+def test_stripe_webhook_cryptographic_signature_success():
+    import stripe
+    import time
+    import json
+    
+    # Enable signature checking by setting a secret
+    original_secret = main.STRIPE_WEBHOOK_SECRET
+    main.STRIPE_WEBHOOK_SECRET = "whsec_testsecret"
+    
+    try:
+        event_payload = {
+            "object": "event",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "customer": "cus_crypto_123",
+                    "subscription": "sub_crypto_123",
+                    "customer_details": {"email": "crypto@trihonor.com"},
+                    "metadata": {"plan": "pro", "email": "crypto@trihonor.com"}
+                }
+            }
+        }
+        
+        payload_bytes = json.dumps(event_payload).encode("utf-8")
+        timestamp = int(time.time())
+        # Generate valid Stripe signature header using stripe's internal helper
+        sig_payload = f"{timestamp}.".encode("utf-8") + payload_bytes
+        signature = stripe.WebhookSignature._compute_signature(sig_payload.decode("utf-8"), "whsec_testsecret")
+        headers = {
+            "stripe-signature": f"t={timestamp},v1={signature}",
+            "Content-Type": "application/json"
+        }
+        
+        response = client.post("/api/stripe/webhook", data=payload_bytes, headers=headers)
+        assert response.status_code == 200
+        assert response.json() == {"status": "success"}
+        
+        # Verify db insertion
+        sub = db.get_subscription_by_customer("cus_crypto_123")
+        assert sub is not None
+        assert sub["status"] == "active"
+        
+    finally:
+        main.STRIPE_WEBHOOK_SECRET = original_secret
+
+def test_stripe_webhook_cryptographic_signature_invalid():
+    import stripe
+    import time
+    import json
+    
+    original_secret = main.STRIPE_WEBHOOK_SECRET
+    main.STRIPE_WEBHOOK_SECRET = "whsec_testsecret"
+    
+    try:
+        event_payload = {"object": "event", "type": "checkout.session.completed", "data": {}}
+        payload_bytes = json.dumps(event_payload).encode("utf-8")
+        
+        # Send with invalid signature
+        headers = {
+            "stripe-signature": f"t={int(time.time())},v1=invalid_signature_hash_xyz",
+            "Content-Type": "application/json"
+        }
+        
+        response = client.post("/api/stripe/webhook", data=payload_bytes, headers=headers)
+        assert response.status_code == 400
+        assert "Invalid signature" in response.json()["detail"]
+        
+    finally:
+        main.STRIPE_WEBHOOK_SECRET = original_secret
+
+
