@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Save, Key, Slack, Eye, EyeOff } from 'lucide-react'
+import { Save, Key, Slack, Eye, EyeOff, Shield } from 'lucide-react'
 import { API_BASE } from '../config'
 
 function Settings() {
