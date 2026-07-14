@@ -450,8 +450,8 @@ def test_llm_jury_consensus(monkeypatch):
     db.set_setting("GROQ_API_KEY", "mock_groq")
     
     # Mock query_gemini and query_groq responses to match (consensus)
-    mock_gem = MagicMock(return_value='{"summary": "Consensus summary", "reasoning": "Gemini reasoning", "proposed_command": "docker restart my-service"}')
-    mock_groq = MagicMock(return_value='{"summary": "Consensus summary", "reasoning": "Groq reasoning", "proposed_command": "docker restart my-service"}')
+    mock_gem = MagicMock(return_value='{"summary": "Consensus summary", "reasoning": "Gemini reasoning", "proposed_skill": "restart_service", "skill_parameters": {"service_name": "my-service"}}')
+    mock_groq = MagicMock(return_value='{"summary": "Consensus summary", "reasoning": "Groq reasoning", "proposed_skill": "restart_service", "skill_parameters": {"service_name": "my-service"}}')
     
     with patch("ai_service.query_gemini", mock_gem), patch("ai_service.query_groq", mock_groq):
         # We need to simulate complexity >= 7 by triggering local check complexity
@@ -459,7 +459,7 @@ def test_llm_jury_consensus(monkeypatch):
         with patch("ai_service.query_ollama", mock_local):
             res = ai_service.analyze_incident("my-service", "High load", "some logs")
             assert "Jüri kararı ile doğrulandı" in res["reasoning"]
-            assert res["proposed_command"] == "docker restart my-service"
+            assert res["proposed_command"] == 'skills.restart_service({"service_name": "my-service"})'
 
 def test_send_to_teams():
     import ai_service

@@ -206,12 +206,26 @@ def increment_cost(provider: str):
     except Exception as e:
         logger.error("Cost tracking error: %s", e)
 
+def format_proposed_command(skill: str, params: dict) -> str:
+    """Helper to convert skill & parameters to backwards-compatible proposed_command representation."""
+    if not skill:
+        return ""
+    if skill == "run_raw_command":
+        return params.get("command", "")
+    
+    # Format as skills.method_name(arg_json)
+    import json
+    param_str = json.dumps(params, sort_keys=True)
+    return f"skills.{skill}({param_str})"
+
 def analyze_incident(service: str, alert_title: str, logs: str) -> dict:
     """
     Sends logs and alert data through the multi-layered Antigravity AI routing pipeline.
     1. Loop-prevention check (cooldown) if past attempts kept failing.
     2. Local routing check (Qwen 7b) to see if it is simple or complex.
-    3. If complex, pro-actively switches between Claude (architectural) and Gemini (routine).
+    3. Category Router classification.
+    4. Routing to Specialist Agents (DB, Security, Infra, Network).
+    5. Parallel Jury Consensus validation (Gemini + Groq) escalating to Claude Judge.
     """
     # 1. Truce Check (Ateşkes)
     truce_key = (service, alert_title)
@@ -237,9 +251,9 @@ def analyze_incident(service: str, alert_title: str, logs: str) -> dict:
     # Apply Log Summarization (Compressor)
     summarized_logs = summarize_log(logs)
 
-    # Stage 1: Local routing check using Qwen 7b
+    # Stage 1: Local routing check using Qwen 7b (Updated to Skills format)
     prompt_local = f"""You are a site reliability analysis router.
-Determine if the following alert can be fixed with a simple routine command (like restarting a docker container, deleting temp files, restarting a service).
+Determine if the following alert can be fixed with a simple routine command (like restarting a docker container, deleting temp files, scaling a service).
 Service: '{service}'
 Alert Title: {alert_title}
 Logs:
@@ -250,7 +264,8 @@ Output ONLY a JSON response in the following schema:
   "simple": true or false,
   "complexity": 1-10 rating,
   "reasoning": "Turkish explanation of findings",
-  "proposed_command": "remediation command if simple, or empty string"
+  "proposed_skill": "scale_compose_service or restart_service or clean_docker_logs or vacuum_db or block_ip or run_raw_command or empty string",
+  "skill_parameters": {{ "uygun_parametre_anahtarı": "değeri" }}
 }}
 """
     ollama_enabled = db.get_setting("OLLAMA_ENABLED", "true") == "true"
@@ -274,17 +289,68 @@ Output ONLY a JSON response in the following schema:
             except Exception as e:
                 logger.warning("Local Qwen JSON parse failed: %s. Raw response: %s", e, local_result)
 
-    if is_simple and local_data.get("proposed_command"):
+    if is_simple and local_data.get("proposed_skill"):
         logger.info("Local Qwen resolved the incident as simple. Bypassing cloud models.")
+        proposed_cmd = format_proposed_command(local_data.get("proposed_skill"), local_data.get("skill_parameters", {}))
         analysis_result = {
             "summary": local_data.get("reasoning", "Basit rutin hata çözümü (Lokal)"),
             "reasoning": f"{local_data.get('reasoning', 'Yerel model tarafından otonom olarak çözüldü.')} (Source: local-ollama)",
-            "proposed_command": local_data.get("proposed_command", "")
+            "proposed_command": proposed_cmd
         }
         TRUCE_CACHE[truce_key] = (now, analysis_result)
         return analysis_result
 
-    # Stage 2 & 3: Cloud routing (Pro-Active Switching: Claude vs Gemini)
+    # Stage 2: Category Routing (Router Agent)
+    category = "infrastructure"
+    gemini_key = db.get_setting("GEMINI_API_KEY")
+    claude_key = db.get_setting("CLAUDE_API_KEY") or db.get_setting("ANTHROPIC_API_KEY")
+    groq_key = db.get_setting("GROQ_API_KEY")
+
+    prompt_router = f"""You are the Chief SRE Router.
+Classify the following alert into one of these categories:
+- 'database': for database locks, vacuum, connection pool issues, slow queries.
+- 'security': for unauthorized access, brute force, blocked ports, security issues.
+- 'infrastructure': for cpu/ram spikes, disk usage, container restart, scaling.
+- 'network': for ssl expiration, dns failures, packet drops, routing.
+
+Alert Title: {alert_title}
+Service: {service}
+Logs:
+\"\"\"
+{summarized_logs}
+\"\"\"
+
+Output ONLY a JSON response in the following schema:
+{{
+  "category": "database or security or infrastructure or network"
+}}
+"""
+    try:
+        if gemini_key:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "contents": [{"parts": [{"text": prompt_router}]}],
+                "generationConfig": {"responseMimeType": "application/json"}
+            }
+            resp = requests.post(url, json=payload, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                cat_data = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                if cat_data.startswith("```json"): cat_data = cat_data[7:]
+                if cat_data.endswith("```"): cat_data = cat_data[:-3]
+                category = json.loads(cat_data.strip()).get("category", "infrastructure")
+    except Exception as e:
+        logger.warning("Router Agent classification failed, defaulting to infrastructure: %s", e)
+
+    # Stage 3: Specialist System Prompts selection
+    agent_roles = {
+        "database": "You are a Database SRE Specialist. Analyze veritabanı kilitlenmeleri, slow queries, and database performance issues.",
+        "security": "You are a Security SRE Specialist. Analyze unauthorized access, firewall configuration, security vulnerabilities, and attack patterns.",
+        "infrastructure": "You are an Infrastructure & Container SRE Specialist. Analyze CPU/RAM saturation, disk space bottlenecks, and container orchestration issues.",
+        "network": "You are a Network & API Gateway SRE Specialist. Analyze DNS configuration, SSL expiry, routing, and api latency."
+    }
+    role_instruction = agent_roles.get(category, agent_roles["infrastructure"])
+
     past_context = ""
     if past_incidents:
         past_context = "\nGEÇMİŞ ONARIM GİRİŞİMLERİ (Bu hata/servis için önceki sonuçlar):\n"
@@ -293,23 +359,34 @@ Output ONLY a JSON response in the following schema:
             past_context += f"- Komut: '{p['proposed_command']}' -> Durum: {status_str}\n"
         past_context += "\nYukarıdaki geçmiş sonuçları dikkate al. Başarısız olan aksiyonları tekrar önerme. Başarılı olanları tercih et.\n"
 
-    prompt_cloud = f"""You are a senior Site Reliability Engineer (SRE).
+    prompt_cloud = f"""{role_instruction}
 An alert was triggered for the service: '{service}'
 Alert Title: {alert_title}
+Category: {category.upper()}
 
 Recent log output:
 \"\"\"
 {summarized_logs}
 \"\"\"
 {past_context}
+
 GÖREV:
 1. Analiz et ve sorunun kök nedenini belirle (root-cause).
-2. Bu sorunu çözmek veya sistemi düzeltmek için çalıştırılabilecek en mantıklı, güvenli kabuk (shell/bash) komutunu belirle (örn: 'docker restart {service}').
-3. Eğer durum kritik değilse veya otomatik olarak çalıştırılacak güvenli bir komut yoksa 'proposed_command' alanını boş bırak.
+2. Sorunu çözmek için aşağıdaki güvenli yeteneklerden (Skill) en uygun olanını seç ve parametrelerini belirle.
 
-TOKEN TASARRUFU TALİMATI (Compressor):
-- Analizini olabildiğince kısa, öz ve net tut.
-- Sadece hata kodunu, dosya yolunu, hata tipini ve doğrudan kök nedeni belirt. Gereksiz veya uzun açıklamalar yapmaktan kaçın.
+KULLANILABİLİR YETENEKLER LİSTESİ:
+1. "scale_compose_service": Docker Compose replika sayısını artırır/azaltır.
+   - Parametreler: {{"service_name": "{service}", "scale_count": <int>}}
+2. "restart_service": Konteyneri veya sistemd servisini yeniden başlatır.
+   - Parametreler: {{"service_name": "{service}"}}
+3. "clean_docker_logs": Docker loglarını temizler (disk doluluğunda kullanılır).
+   - Parametreler: {{"days_old": <int>}}
+4. "vacuum_db": Veritabanını temizler ve alanı geri kazanır.
+   - Parametreler: {{"database_name": "<string>"}}
+5. "block_ip": Zararlı IP adresini yerel firewall ile engeller.
+   - Parametreler: {{"ip_address": "<string>"}}
+6. "run_raw_command" (Sadece fallback/acil durumlarda): Yukarıdaki yeteneklerden hiçbiri uymuyorsa özel bash komutu önerir.
+   - Parametreler: {{"command": "<string>"}}
 
 ÖNEMLİ: Cevabı kesinlikle aşağıdaki JSON şemasında dön. Başka hiçbir açıklama, markdown bloğu veya süsleme yapma. Cevap sadece geçerli bir JSON objesi olmalı.
 
@@ -317,13 +394,11 @@ JSON Şeması:
 {{
   "summary": "Türkçe kısa 1 satırlık sorun özeti",
   "reasoning": "Türkçe detaylı SRE analizi ve kök neden açıklaması",
-  "proposed_command": "Çözüm için sunucuda çalıştırılacak tam bash komutu (veya boş string)"
+  "proposed_skill": "seçilen_skill_adı (veya acil durumlar için 'run_raw_command' veya komut gerekmiyorsa '')",
+  "skill_parameters": {{ "uygun_parametre_anahtarı": "değeri" }}
 }}
 """
 
-    gemini_key = db.get_setting("GEMINI_API_KEY")
-    claude_key = db.get_setting("CLAUDE_API_KEY") or db.get_setting("ANTHROPIC_API_KEY")
-    groq_key = db.get_setting("GROQ_API_KEY")
     result_text = None
     source = None
 
@@ -340,28 +415,32 @@ JSON Şeması:
                 if cleaned_gem.startswith("```json"): cleaned_gem = cleaned_gem[7:]
                 if cleaned_gem.endswith("```"): cleaned_gem = cleaned_gem[:-3]
                 data_gemini = json.loads(cleaned_gem.strip())
-                cmd_gemini = data_gemini.get("proposed_command", "").strip()
+                skill_gemini = data_gemini.get("proposed_skill", "").strip()
+                params_gemini = data_gemini.get("skill_parameters", {})
 
                 cleaned_groq = res_groq.strip()
                 if cleaned_groq.startswith("```json"): cleaned_groq = cleaned_groq[7:]
                 if cleaned_groq.endswith("```"): cleaned_groq = cleaned_groq[:-3]
                 data_groq = json.loads(cleaned_groq.strip())
-                cmd_groq = data_groq.get("proposed_command", "").strip()
+                skill_groq = data_groq.get("proposed_skill", "").strip()
+                params_groq = data_groq.get("skill_parameters", {})
 
-                norm_gem = re.sub(r"[\s'\"]", "", cmd_gemini).lower()
-                norm_groq = re.sub(r"[\s'\"]", "", cmd_groq).lower()
+                # Normalize keys for comparison
+                norm_gem = f"{skill_gemini}:{json.dumps(params_gemini, sort_keys=True)}"
+                norm_groq = f"{skill_groq}:{json.dumps(params_groq, sort_keys=True)}"
 
                 if norm_gem == norm_groq:
-                    logger.info("Jury Consensus reached: %s", cmd_gemini)
+                    logger.info("Jury Consensus reached on skill: %s", skill_gemini)
+                    proposed_cmd = format_proposed_command(skill_gemini, params_gemini)
                     analysis_result = {
                         "summary": data_gemini.get("summary", "Jüri Konsensüs Çözümü"),
                         "reasoning": f"{data_gemini.get('reasoning', '')} [Jüri kararı ile doğrulandı (Gemini & Groq ortak kararı)]",
-                        "proposed_command": cmd_gemini
+                        "proposed_command": proposed_cmd
                     }
                     TRUCE_CACHE[truce_key] = (now, analysis_result)
                     return analysis_result
                 else:
-                    logger.warning("Jury Disagreement! Gemini proposed '%s' | Groq proposed '%s'. Escalating to Claude Judge...", cmd_gemini, cmd_groq)
+                    logger.warning("Jury Disagreement! Gemini proposed '%s' | Groq proposed '%s'. Escalating to Claude Judge...", norm_gem, norm_groq)
                     if claude_key:
                         prompt_judge = f"""You are the Chief SRE Judge for the autonomous platform.
 An incident occurred in the service '{service}' with title '{alert_title}'.
@@ -370,16 +449,17 @@ Logs:
 {summarized_logs}
 \"\"\"
 
-The SRE Jury of two models disagreed on the repair command:
-Model 1 (Gemini) proposed: '{cmd_gemini}' (Reason: {data_gemini.get('reasoning')})
-Model 2 (Groq) proposed: '{cmd_groq}' (Reason: {data_groq.get('reasoning')})
+The SRE Jury of two models disagreed on the repair skill and parameters:
+Model 1 (Gemini) proposed: Skill: '{skill_gemini}' with Params: {params_gemini} (Reason: {data_gemini.get('reasoning')})
+Model 2 (Groq) proposed: Skill: '{skill_groq}' with Params: {params_groq} (Reason: {data_groq.get('reasoning')})
 
-Determine which command is safer and more correct, or provide a corrected/merged command if both are wrong.
+Determine which skill and parameters are safer and more correct, or provide a corrected skill proposal if both are wrong.
 Output ONLY a JSON response in the following schema:
 {{
   "summary": "Türkçe kısa sorun özeti",
   "reasoning": "Türkçe jüri anlaşmazlık çözümü ve nihai hakem kararı açıklaması",
-  "proposed_command": "Nihai çalıştırılacak komut (veya boş string)"
+  "proposed_skill": "seçilen_skill_adı",
+  "skill_parameters": {{ "uygun_parametre_anahtarı": "değeri" }}
 }}
 """
                         res_claude = query_claude(prompt_judge)
@@ -389,10 +469,11 @@ Output ONLY a JSON response in the following schema:
                             if cleaned_c.endswith("```"): cleaned_c = cleaned_c[:-3]
                             data_judge = json.loads(cleaned_c.strip())
                             
+                            proposed_cmd = format_proposed_command(data_judge.get("proposed_skill", ""), data_judge.get("skill_parameters", {}))
                             analysis_result = {
                                 "summary": data_judge.get("summary", "Jüri Hakem Kararı"),
                                 "reasoning": f"{data_judge.get('reasoning', '')} [Claude Hakem Kararı - Jüri anlaşmazlığı çözüldü]",
-                                "proposed_command": data_judge.get("proposed_command", "")
+                                "proposed_command": proposed_cmd
                             }
                             TRUCE_CACHE[truce_key] = (now, analysis_result)
                             return analysis_result
@@ -493,10 +574,14 @@ Output ONLY a JSON response in the following schema:
             if cleaned.endswith("```"):
                 cleaned = cleaned[:-3]
             data = json.loads(cleaned.strip())
+            proposed_skill = data.get("proposed_skill", "")
+            skill_params = data.get("skill_parameters", {})
+            proposed_cmd = format_proposed_command(proposed_skill, skill_params)
+            
             analysis_result = {
                 "summary": data.get("summary", "Bilinmeyen Sorun"),
-                "reasoning": f"{data.get('reasoning', 'Açıklama üretilemedi.')} (Source: {source})",
-                "proposed_command": data.get("proposed_command", "")
+                "reasoning": f"{data.get('reasoning', 'Açıklama üretilemedi.')} (Source: {source} | Category: {category})",
+                "proposed_command": proposed_cmd
             }
         except Exception as e:
             logger.error("Failed to parse JSON response: %s. Raw content: %s", e, result_text)
