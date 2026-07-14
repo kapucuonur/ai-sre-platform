@@ -62,7 +62,7 @@ class DaemonStatusModel(BaseModel):
 # --- Core Webhooks ---
 
 @app.post("/api/webhook/grafana")
-async def grafana_webhook(request: Request, background_tasks: BackgroundTasks):
+async def grafana_webhook(request: Request, background_tasks: BackgroundTasks, api_key: Optional[str] = None):
     """
     Receives alerts from Grafana and processes them asynchronously.
     """
@@ -87,14 +87,15 @@ async def grafana_webhook(request: Request, background_tasks: BackgroundTasks):
             logs_text = alert.get("annotations", {}).get("description", logs_text)
 
         # Trigger AI reasoning and Slack notification in background
-        background_tasks.add_task(process_incident, service, alert_title, logs_text, payload)
+        api_key_to_use = api_key or "self-hosted"
+        background_tasks.add_task(process_incident, service, alert_title, logs_text, payload, api_key_to_use)
         
         return {"status": "processing"}
     except Exception as e:
         logger.error("Failed to parse Grafana webhook: %s", e)
         raise HTTPException(status_code=400, detail=str(e))
 
-def process_incident(service: str, title: str, logs: str, alert_payload: dict):
+def process_incident(service: str, title: str, logs: str, alert_payload: dict, api_key: str = "self-hosted"):
     """Background task to run AI SRE analysis and trigger ChatOps."""
     logger.info("Processing incident for service: %s", service)
     
@@ -113,7 +114,8 @@ def process_incident(service: str, title: str, logs: str, alert_payload: dict):
             alert_payload=alert_payload,
             logs=logs,
             ai_analysis=analysis["reasoning"],
-            proposed_command=proposed_cmd
+            proposed_command=proposed_cmd,
+            api_key=api_key
         )
         db.update_incident_status(incident_id, "approved")
         
@@ -146,7 +148,8 @@ def process_incident(service: str, title: str, logs: str, alert_payload: dict):
             alert_payload=alert_payload,
             logs=logs,
             ai_analysis=analysis["reasoning"],
-            proposed_command=proposed_cmd
+            proposed_command=proposed_cmd,
+            api_key=api_key
         )
         
         logger.info("Created incident ID: %s", incident_id)
@@ -168,6 +171,7 @@ async def receive_daemon_incident(payload: DaemonIncidentModel, x_sre_api_key: O
     Receives healing incidents reported by the local Pi 5 SRE Daemon.
     """
     active_keys = db.get_active_api_keys()
+    api_key_to_use = x_sre_api_key or "self-hosted"
     if active_keys:
         if not x_sre_api_key or x_sre_api_key not in active_keys:
             logger.warning("Unauthorized daemon incident report attempt.")
@@ -180,7 +184,8 @@ async def receive_daemon_incident(payload: DaemonIncidentModel, x_sre_api_key: O
         logs=payload.logs,
         ai_analysis="Processed by local Pi 5 SRE Daemon.",
         proposed_command=payload.proposed_command,
-        duration=payload.duration
+        duration=payload.duration,
+        api_key=api_key_to_use
     )
     # Map status to approved then resolved/failed
     db.update_incident_status(incident_id, "approved")
@@ -471,12 +476,14 @@ sudo systemctl status sre-daemon.service --no-pager | grep -E "Active:"
     return Response(content=script, media_type="text/plain")
 
 @app.get("/api/incidents")
-async def list_incidents():
-    return db.get_all_incidents()
+async def list_incidents(x_sre_api_key: Optional[str] = Header(None, alias="X-SRE-API-Key")):
+    api_key_to_use = x_sre_api_key or "self-hosted"
+    return db.get_all_incidents(api_key_to_use)
 
 @app.get("/api/history")
-async def get_history():
-    return db.get_all_incidents()
+async def get_history(x_sre_api_key: Optional[str] = Header(None, alias="X-SRE-API-Key")):
+    api_key_to_use = x_sre_api_key or "self-hosted"
+    return db.get_all_incidents(api_key_to_use)
 
 @app.post("/api/incidents/{incident_id}/action")
 async def trigger_manual_action(incident_id: int, payload: ManualActionModel, background_tasks: BackgroundTasks):

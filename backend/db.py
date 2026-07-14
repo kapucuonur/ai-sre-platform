@@ -45,6 +45,10 @@ def init_db():
             conn.execute("ALTER TABLE incidents ADD COLUMN duration REAL")
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE incidents ADD COLUMN api_key TEXT DEFAULT 'self-hosted'")
+        except sqlite3.OperationalError:
+            pass
         conn.execute("""
             CREATE TABLE IF NOT EXISTS subscriptions (
                 stripe_customer_id TEXT PRIMARY KEY,
@@ -112,15 +116,15 @@ def get_all_settings() -> dict:
     except Exception:
         return {}
 
-def create_incident(title: str, service: str, alert_payload: dict, logs: str, ai_analysis: str, proposed_command: str, duration: float = None) -> int:
+def create_incident(title: str, service: str, alert_payload: dict, logs: str, ai_analysis: str, proposed_command: str, duration: float = None, api_key: str = "self-hosted") -> int:
     now = datetime.now().isoformat()
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute(
             """
             INSERT INTO incidents 
-            (status, title, service, alert_payload, logs, ai_analysis, proposed_command, duration, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (status, title, service, alert_payload, logs, ai_analysis, proposed_command, duration, created_at, updated_at, api_key)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "pending" if proposed_command else "resolved",
@@ -132,7 +136,8 @@ def create_incident(title: str, service: str, alert_payload: dict, logs: str, ai
                 proposed_command,
                 duration,
                 now,
-                now
+                now,
+                api_key
             )
         )
         conn.commit()
@@ -165,11 +170,14 @@ def update_incident_status(incident_id: int, status: str, action_output: str = N
                 )
         conn.commit()
 
-def get_all_incidents() -> list:
+def get_all_incidents(api_key: str = None) -> list:
     try:
         with get_db() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT * FROM incidents ORDER BY id DESC")
+            if api_key:
+                cur.execute("SELECT * FROM incidents WHERE api_key = ? ORDER BY id DESC", (api_key,))
+            else:
+                cur.execute("SELECT * FROM incidents ORDER BY id DESC")
             return [dict(row) for row in cur.fetchall()]
     except Exception:
         return []
