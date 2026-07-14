@@ -440,6 +440,44 @@ def test_fatigue_analytics():
     assert data[0]["service"] == "api-service"
     assert data[0]["count"] == 2
 
+def test_llm_jury_consensus(monkeypatch):
+    import ai_service
+    from unittest.mock import patch, MagicMock
+    
+    # Enable jury and set key settings in database
+    db.set_setting("llm_jury_enabled", "true")
+    db.set_setting("GEMINI_API_KEY", "mock_gemini")
+    db.set_setting("GROQ_API_KEY", "mock_groq")
+    
+    # Mock query_gemini and query_groq responses to match (consensus)
+    mock_gem = MagicMock(return_value='{"summary": "Consensus summary", "reasoning": "Gemini reasoning", "proposed_command": "docker restart my-service"}')
+    mock_groq = MagicMock(return_value='{"summary": "Consensus summary", "reasoning": "Groq reasoning", "proposed_command": "docker restart my-service"}')
+    
+    with patch("ai_service.query_gemini", mock_gem), patch("ai_service.query_groq", mock_groq):
+        # We need to simulate complexity >= 7 by triggering local check complexity
+        mock_local = MagicMock(return_value='{"simple": false, "complexity": 8, "reasoning": "high complexity"}')
+        with patch("ai_service.query_ollama", mock_local):
+            res = ai_service.analyze_incident("my-service", "High load", "some logs")
+            assert "Jüri kararı ile doğrulandı" in res["reasoning"]
+            assert res["proposed_command"] == "docker restart my-service"
+
+def test_send_to_teams():
+    import ai_service
+    from unittest.mock import patch, MagicMock
+    
+    db.set_setting("TEAMS_WEBHOOK_URL", "https://outlook.office.com/webhook/mock")
+    
+    mock_post = MagicMock()
+    mock_post.return_value.status_code = 200
+    
+    with patch("requests.post", mock_post):
+        ok = ai_service.send_to_teams(123, "my-service", "Title", "Summary", "Reasoning", "docker restart")
+        assert ok is True
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+        assert args[0] == "https://outlook.office.com/webhook/mock"
+        assert kwargs["json"]["attachments"][0]["content"]["body"][1]["facts"][0]["value"] == "123"
+
 
 
 

@@ -140,6 +140,16 @@ def process_incident(service: str, title: str, logs: str, alert_payload: dict, a
             autonomous_status=final_status,
             action_output=output
         )
+        ai_service.send_to_teams(
+            incident_id=incident_id,
+            service=service,
+            title=title,
+            summary=analysis["summary"],
+            reasoning=analysis["reasoning"],
+            proposed_command=proposed_cmd,
+            autonomous_status=final_status,
+            action_output=output
+        )
     else:
         # Standard flow (needs approval for high/critical or just waiting)
         incident_id = db.create_incident(
@@ -157,6 +167,14 @@ def process_incident(service: str, title: str, logs: str, alert_payload: dict, a
         # If a remediation command is suggested, send interactive Slack card
         if proposed_cmd:
             ai_service.send_to_slack(
+                incident_id=incident_id,
+                service=service,
+                title=title,
+                summary=analysis["summary"],
+                reasoning=analysis["reasoning"],
+                proposed_command=proposed_cmd
+            )
+            ai_service.send_to_teams(
                 incident_id=incident_id,
                 service=service,
                 title=title,
@@ -193,6 +211,16 @@ async def receive_daemon_incident(payload: DaemonIncidentModel, x_sre_api_key: O
     
     # Notify Slack
     ai_service.send_to_slack(
+        incident_id=incident_id,
+        service=payload.service,
+        title=payload.title,
+        summary=payload.title,
+        reasoning="Processed autonomously by local Pi 5 SRE Daemon.",
+        proposed_command=payload.proposed_command,
+        autonomous_status=payload.status,
+        action_output=payload.action_output
+    )
+    ai_service.send_to_teams(
         incident_id=incident_id,
         service=payload.service,
         title=payload.title,

@@ -134,6 +134,50 @@ def query_claude(prompt: str) -> str:
         logger.error("Claude API call failed: %s", e)
         return None
 
+def query_gemini(prompt: str) -> str:
+    """Helper to query Google Gemini API."""
+    gemini_key = db.get_setting("GEMINI_API_KEY")
+    if not gemini_key:
+        logger.warning("Gemini API key not set in database.")
+        return None
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+        return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception as e:
+        logger.error("Gemini API call failed: %s", e)
+        return None
+
+def query_groq(prompt: str) -> str:
+    """Helper to query Groq API."""
+    groq_key = db.get_setting("GROQ_API_KEY")
+    if not groq_key:
+        logger.warning("Groq API key not set in database.")
+        return None
+    try:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {groq_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"}
+        }
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        logger.error("Groq API call failed: %s", e)
+        return None
+
 def increment_cost(provider: str):
     """Tracks and accumulates monetary API expenditure."""
     cost_map = {
@@ -279,10 +323,83 @@ JSON Şeması:
 
     gemini_key = db.get_setting("GEMINI_API_KEY")
     claude_key = db.get_setting("CLAUDE_API_KEY") or db.get_setting("ANTHROPIC_API_KEY")
+    groq_key = db.get_setting("GROQ_API_KEY")
     result_text = None
     source = None
 
-    # Decide provider based on complexity
+    # --- LLM Jury Consensus Module ---
+    jury_enabled = db.get_setting("llm_jury_enabled", "true") == "true"
+    if jury_enabled and complexity >= 7 and gemini_key and groq_key:
+        logger.info("Initiating LLM Jury consensus for complexity %d...", complexity)
+        res_gemini = query_gemini(prompt_cloud)
+        res_groq = query_groq(prompt_cloud)
+        
+        if res_gemini and res_groq:
+            try:
+                cleaned_gem = res_gemini.strip()
+                if cleaned_gem.startswith("```json"): cleaned_gem = cleaned_gem[7:]
+                if cleaned_gem.endswith("```"): cleaned_gem = cleaned_gem[:-3]
+                data_gemini = json.loads(cleaned_gem.strip())
+                cmd_gemini = data_gemini.get("proposed_command", "").strip()
+
+                cleaned_groq = res_groq.strip()
+                if cleaned_groq.startswith("```json"): cleaned_groq = cleaned_groq[7:]
+                if cleaned_groq.endswith("```"): cleaned_groq = cleaned_groq[:-3]
+                data_groq = json.loads(cleaned_groq.strip())
+                cmd_groq = data_groq.get("proposed_command", "").strip()
+
+                norm_gem = re.sub(r"[\s'\"]", "", cmd_gemini).lower()
+                norm_groq = re.sub(r"[\s'\"]", "", cmd_groq).lower()
+
+                if norm_gem == norm_groq:
+                    logger.info("Jury Consensus reached: %s", cmd_gemini)
+                    analysis_result = {
+                        "summary": data_gemini.get("summary", "Jüri Konsensüs Çözümü"),
+                        "reasoning": f"{data_gemini.get('reasoning', '')} [Jüri kararı ile doğrulandı (Gemini & Groq ortak kararı)]",
+                        "proposed_command": cmd_gemini
+                    }
+                    TRUCE_CACHE[truce_key] = (now, analysis_result)
+                    return analysis_result
+                else:
+                    logger.warning("Jury Disagreement! Gemini proposed '%s' | Groq proposed '%s'. Escalating to Claude Judge...", cmd_gemini, cmd_groq)
+                    if claude_key:
+                        prompt_judge = f"""You are the Chief SRE Judge for the autonomous platform.
+An incident occurred in the service '{service}' with title '{alert_title}'.
+Logs:
+\"\"\"
+{summarized_logs}
+\"\"\"
+
+The SRE Jury of two models disagreed on the repair command:
+Model 1 (Gemini) proposed: '{cmd_gemini}' (Reason: {data_gemini.get('reasoning')})
+Model 2 (Groq) proposed: '{cmd_groq}' (Reason: {data_groq.get('reasoning')})
+
+Determine which command is safer and more correct, or provide a corrected/merged command if both are wrong.
+Output ONLY a JSON response in the following schema:
+{{
+  "summary": "Türkçe kısa sorun özeti",
+  "reasoning": "Türkçe jüri anlaşmazlık çözümü ve nihai hakem kararı açıklaması",
+  "proposed_command": "Nihai çalıştırılacak komut (veya boş string)"
+}}
+"""
+                        res_claude = query_claude(prompt_judge)
+                        if res_claude:
+                            cleaned_c = res_claude.strip()
+                            if cleaned_c.startswith("```json"): cleaned_c = cleaned_c[7:]
+                            if cleaned_c.endswith("```"): cleaned_c = cleaned_c[:-3]
+                            data_judge = json.loads(cleaned_c.strip())
+                            
+                            analysis_result = {
+                                "summary": data_judge.get("summary", "Jüri Hakem Kararı"),
+                                "reasoning": f"{data_judge.get('reasoning', '')} [Claude Hakem Kararı - Jüri anlaşmazlığı çözüldü]",
+                                "proposed_command": data_judge.get("proposed_command", "")
+                            }
+                            TRUCE_CACHE[truce_key] = (now, analysis_result)
+                            return analysis_result
+            except Exception as jury_ex:
+                logger.error("Jury decision parsing failed: %s", jury_ex)
+
+    # Decide provider based on complexity (if Jury Consensus was not completed)
     primary_provider = "claude" if (complexity >= 8 and claude_key) else "gemini"
     
     # Try primary provider
@@ -511,4 +628,87 @@ def send_to_slack(incident_id: int, service: str, title: str, summary: str, reas
         return True
     except Exception as e:
         logger.error("Failed to send Slack notification: %s", e)
+        return False
+
+def send_to_teams(incident_id: int, service: str, title: str, summary: str, reasoning: str, proposed_command: str, autonomous_status: str = None, action_output: str = None) -> bool:
+    """
+    Sends the formatted incident blocks to the configured Microsoft Teams Webhook.
+    """
+    teams_webhook = db.get_setting("TEAMS_WEBHOOK_URL")
+    if not teams_webhook:
+        logger.debug("Teams webhook URL not configured, skipping Teams alert.")
+        return False
+
+    # Build Adaptive Card JSON payload
+    teams_payload = {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": {
+                    "type": "AdaptiveCard",
+                    "version": "1.4",
+                    "body": [
+                        {
+                            "type": "TextBlock",
+                            "size": "medium",
+                            "weight": "bolder",
+                            "text": f"🚨 AI SRE: Incident Detected in {service.upper()}",
+                            "style": "heading"
+                        },
+                        {
+                            "type": "FactSet",
+                            "facts": [
+                                {"title": "Incident ID:", "value": str(incident_id)},
+                                {"title": "Title:", "value": title},
+                                {"title": "Summary:", "value": summary}
+                            ]
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "**Reasoning / Analysis:**\n" + reasoning,
+                            "wrap": True
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+    if proposed_command:
+        teams_payload["attachments"][0]["content"]["body"].append({
+            "type": "TextBlock",
+            "text": f"**Proposed Command:**\n`{proposed_command}`",
+            "wrap": True
+        })
+
+    if autonomous_status:
+        teams_payload["attachments"][0]["content"]["body"].append({
+            "type": "TextBlock",
+            "text": f"**Execution Status:** {autonomous_status.upper()}",
+            "color": "good" if autonomous_status == "resolved" else "attention",
+            "weight": "bolder"
+        })
+
+    if action_output:
+        teams_payload["attachments"][0]["content"]["body"].append({
+            "type": "TextBlock",
+            "text": f"**Output:**\n```\n{action_output[:500]}\n```",
+            "wrap": True
+        })
+
+    dashboard_url = db.get_setting("DASHBOARD_URL", "https://sre.trihonor.com")
+    teams_payload["attachments"][0]["content"]["actions"] = [
+        {
+            "type": "Action.OpenUrl",
+            "title": "View Dashboard 🖥️",
+            "url": dashboard_url
+        }
+    ]
+
+    try:
+        r = requests.post(teams_webhook, json=teams_payload, timeout=10)
+        return r.status_code in (200, 201, 202)
+    except Exception as e:
+        logger.error("Failed to send MS Teams notification: %s", e)
         return False
