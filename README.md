@@ -15,6 +15,17 @@ This platform connects to your existing alert channels (like Grafana Webhooks), 
 
 ---
 
+## Key Features (New!)
+
+* **Stripe Billing Integration**: Full Stripe checkout subscription flow for Pro (€49/mo) and Scale (€149/mo) plans, with secure webhook signature validation and automated client API key generation.
+* **Onboarding Email Delivery**: Automated onboarding email templates sent via Zoner.fi SMTP to new subscribers containing their SRE installation keys.
+* **Incident Rollback System**: Revert LLM-remedied file changes dynamically from the frontend history page via git checkout integration.
+* **Post-Mortem Reports**: Beautiful, self-contained, printer-friendly HTML Incident Post-Mortem reports outlining root causes, logs, proposed code fixes, and outcome timelines.
+* **Dynamic Heartbeat Observation**: Visual live/offline daemon status checker based on client report timing (5 minutes status heartbeat).
+
+
+---
+
 ## Quick Start (Local Deployment)
 
 ### 1. Prerequisite
