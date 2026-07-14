@@ -209,6 +209,40 @@ def get_past_incidents(service: str, title: str, limit: int = 5) -> list:
     except Exception:
         return []
 
+def get_alert_fatigue(api_key: str = None) -> list:
+    try:
+        with get_db() as conn:
+            cur = conn.cursor()
+            if api_key:
+                cur.execute(
+                    """
+                    SELECT service, title, COUNT(*) as count, 
+                           SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count,
+                           SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count
+                    FROM incidents 
+                    WHERE api_key = ? 
+                    GROUP BY service, title 
+                    ORDER BY count DESC 
+                    LIMIT 10
+                    """
+                    , (api_key,)
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT service, title, COUNT(*) as count, 
+                           SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count,
+                           SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count
+                    FROM incidents 
+                    GROUP BY service, title 
+                    ORDER BY count DESC 
+                    LIMIT 10
+                    """
+                )
+            return [dict(row) for row in cur.fetchall()]
+    except Exception:
+        return []
+
 def create_or_update_subscription(customer_id: str, subscription_id: str, plan: str, status: str, api_key: str = None) -> None:
     now = datetime.now().isoformat()
     with get_db() as conn:

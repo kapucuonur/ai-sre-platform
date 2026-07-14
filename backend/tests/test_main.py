@@ -410,6 +410,36 @@ def test_generate_incident_report_success():
     assert "api-service" in response.text
     assert "Target File" in response.text
 
+def test_fatigue_analytics():
+    # Insert mock incidents with same title to generate fatigue
+    db.create_incident(
+        title="OOM Failure In API Service",
+        service="api-service",
+        alert_payload={},
+        logs="out of memory error log content",
+        ai_analysis="analysis description",
+        proposed_command="docker restart api",
+        api_key="self-hosted"
+    )
+    db.create_incident(
+        title="OOM Failure In API Service",
+        service="api-service",
+        alert_payload={},
+        logs="out of memory error log content",
+        ai_analysis="analysis description",
+        proposed_command="docker restart api",
+        api_key="self-hosted"
+    )
+    
+    # Check fatigue analytics REST endpoint
+    response = client.get("/api/analytics/fatigue", headers={"X-SRE-API-Key": "self-hosted"})
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) >= 1
+    assert data[0]["title"] == "OOM Failure In API Service"
+    assert data[0]["service"] == "api-service"
+    assert data[0]["count"] == 2
+
 
 
 

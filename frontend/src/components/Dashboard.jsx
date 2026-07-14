@@ -6,6 +6,7 @@ function Dashboard() {
   const [status, setStatus] = useState(null)
   const [error, setError] = useState(null)
   const [history, setHistory] = useState([])
+  const [fatigue, setFatigue] = useState([])
 
   useEffect(() => {
     const fetchStatus = () => {
@@ -38,15 +39,29 @@ function Dashboard() {
         .catch((err) => console.error('Error fetching metrics history:', err))
     }
 
+    const fetchFatigue = () => {
+      fetch(`${API_BASE}/api/analytics/fatigue`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setFatigue(data)
+          }
+        })
+        .catch((err) => console.error('Error fetching fatigue analytics:', err))
+    }
+
     fetchStatus()
     fetchHistory()
+    fetchFatigue()
     
     const intervalStatus = setInterval(fetchStatus, 5000)
     const intervalHistory = setInterval(fetchHistory, 15000)
+    const intervalFatigue = setInterval(fetchFatigue, 15000)
     
     return () => {
       clearInterval(intervalStatus)
       clearInterval(intervalHistory)
+      clearInterval(intervalFatigue)
     }
   }, [])
 
@@ -184,31 +199,71 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="containers-section">
-        <h2 className="section-title">Active Docker Containers</h2>
-        {status.containers.length === 0 ? (
-          <p className="page-subtitle" style={{ fontStyle: 'italic' }}>No active containers found or Docker is offline.</p>
-        ) : (
-          <div className="containers-list">
-            {status.containers.map((container, idx) => {
-              const isUp = container.status.toLowerCase().includes('up')
-              return (
-                <div key={idx} className="container-card">
-                  <div>
-                    <div className="container-name">{container.name}</div>
-                    <div className="container-status">{container.status}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1.5rem' }}>
+        {/* Active Docker Containers */}
+        <div className="card" style={{ padding: '1.5rem', background: '#0b131c' }}>
+          <h2 className="section-title" style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>Active Docker Containers</h2>
+          {status.containers.length === 0 ? (
+            <p className="page-subtitle" style={{ fontStyle: 'italic' }}>No active containers found or Docker is offline.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', maxHeight: '350px', overflowY: 'auto' }}>
+              {status.containers.map((container, idx) => {
+                const isUp = container.status.toLowerCase().includes('up')
+                return (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div>
+                      <div className="container-name" style={{ fontWeight: 600, fontSize: '0.9rem' }}>{container.name}</div>
+                      <div className="container-status" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{container.status}</div>
+                    </div>
+                    <span 
+                      className={`badge ${isUp ? 'badge-resolved' : 'badge-failed'}`}
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                    >
+                      {isUp ? 'Running' : 'Stopped'}
+                    </span>
                   </div>
-                  <span 
-                    className={`badge ${isUp ? 'badge-resolved' : 'badge-failed'}`}
-                    style={{ padding: '0.2rem 0.5rem' }}
-                  >
-                    {isUp ? 'Running' : 'Stopped'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Alert Fatigue Dashboard */}
+        <div className="card" style={{ padding: '1.5rem', background: '#0b131c' }}>
+          <h2 className="section-title" style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>Alert Fatigue Analysis</h2>
+          {fatigue.length === 0 ? (
+            <p className="page-subtitle" style={{ fontStyle: 'italic' }}>No repetitive incident data recorded yet.</p>
+          ) : (
+            <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: '#94a3b8' }}>
+                    <th style={{ padding: '0.5rem' }}>Incident / Service</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'center' }}>Total</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'right' }}>Resolved / Failed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fatigue.map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <td style={{ padding: '0.8rem 0.5rem' }}>
+                        <div style={{ fontWeight: 600 }}>{item.title}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#22d3ee', marginTop: '2px' }}>{item.service}</div>
+                      </td>
+                      <td style={{ padding: '0.8rem 0.5rem', textAlign: 'center', fontWeight: 'bold' }}>
+                        {item.count}
+                      </td>
+                      <td style={{ padding: '0.8rem 0.5rem', textAlign: 'right' }}>
+                        <span style={{ color: '#22c55e', marginRight: '6px' }}>{item.resolved_count} OK</span>
+                        <span style={{ color: '#ef4444' }}>{item.failed_count} ERR</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

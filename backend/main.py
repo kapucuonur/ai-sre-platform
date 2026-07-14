@@ -485,6 +485,11 @@ async def get_history(x_sre_api_key: Optional[str] = Header(None, alias="X-SRE-A
     api_key_to_use = x_sre_api_key or "self-hosted"
     return db.get_all_incidents(api_key_to_use)
 
+@app.get("/api/analytics/fatigue")
+async def get_fatigue_analytics(x_sre_api_key: Optional[str] = Header(None, alias="X-SRE-API-Key")):
+    api_key_to_use = x_sre_api_key or "self-hosted"
+    return db.get_alert_fatigue(api_key_to_use)
+
 @app.post("/api/incidents/{incident_id}/action")
 async def trigger_manual_action(incident_id: int, payload: ManualActionModel, background_tasks: BackgroundTasks):
     """
