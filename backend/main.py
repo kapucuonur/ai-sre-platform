@@ -634,6 +634,16 @@ async def stripe_webhook(request: Request):
     return {"status": "success"}
 
 def send_onboarding_email(email: str, api_key: str, plan: str):
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = os.getenv("SMTP_PORT")
+    smtp_user = os.getenv("SMTP_USERNAME")
+    smtp_pass = os.getenv("SMTP_PASSWORD")
+    smtp_from = os.getenv("SMTP_FROM_EMAIL", "noreply@trihonor.com")
+
     logger.info(
         "\n"
         "=================================================================\n"
@@ -645,6 +655,96 @@ def send_onboarding_email(email: str, api_key: str, plan: str):
         "=================================================================\n",
         email, plan.upper(), api_key, api_key
     )
+
+    if smtp_host and smtp_port and smtp_user and smtp_pass:
+        try:
+            msg = MIMEMultipart()
+            msg["From"] = smtp_from
+            msg["To"] = email
+            msg["Subject"] = "Welcome to SRE Daemon - Your API Key"
+
+            body = f"""Hi there,
+
+Thank you for subscribing to SRE Daemon {plan.upper()} Plan!
+
+Your unique API Key is:
+{api_key}
+
+To install and register SRE Daemon on your server, run the following command:
+curl -sSL https://sre.trihonor.com/install.sh | SRE_API_KEY={api_key} SRE_PLATFORM_URL=https://sre-api.trihonor.com bash
+
+Best regards,
+The TriHonor Team
+"""
+            msg.attach(MIMEText(body, "plain"))
+
+            with smtplib.SMTP(smtp_host, int(smtp_port)) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+            logger.info("Successfully sent onboarding email to %s via SMTP.", email)
+        except Exception as e:
+            logger.error("Failed to send onboarding email via SMTP: %s", e)
+
+@app.post("/api/incidents/{incident_id}/rollback")
+async def rollback_incident(incident_id: int):
+    """
+    Reverts file changes applied in a self-healing incident.
+    """
+    from pathlib import Path
+    incident = db.get_incident(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+        
+    if incident["status"] != "resolved" and incident["status"] != "failed":
+        raise HTTPException(status_code=400, detail="Only resolved or failed incidents can be rolled back")
+        
+    cmd = incident["proposed_command"]
+    reverted_files = []
+    
+    # Check if proposed_command is a JSON list of actions
+    if cmd.strip().startswith("["):
+        try:
+            actions = json.loads(cmd)
+            for act in actions:
+                act_type = act.get("type")
+                target = act.get("target")
+                if act_type in ("replace", "write") and target:
+                    target_path = Path(target)
+                    # Resolve git repository of target_path
+                    repo_dir = None
+                    try:
+                        res = subprocess.run(
+                            ["git", "-C", str(target_path.parent), "rev-parse", "--show-toplevel"],
+                            capture_output=True, text=True, timeout=5
+                        )
+                        if res.returncode == 0:
+                            repo_dir = Path(res.stdout.strip()).resolve()
+                    except Exception:
+                        pass
+                        
+                    if repo_dir:
+                        # Revert changes to file
+                        rel_path = target_path.relative_to(repo_dir)
+                        revert_res = subprocess.run(
+                            ["git", "-C", str(repo_dir), "checkout", "--", str(rel_path)],
+                            capture_output=True, text=True, timeout=5
+                        )
+                        if revert_res.returncode == 0:
+                            reverted_files.append(f"Reverted file: {target}")
+                            logger.info("Successfully rolled back %s via git checkout", target)
+                        else:
+                            reverted_files.append(f"Failed to revert {target}: {revert_res.stderr}")
+                    else:
+                        reverted_files.append(f"Not a git repository: {target} (cannot auto-revert)")
+        except Exception as e:
+            logger.error("Failed to parse actions JSON for rollback: %s", e)
+            raise HTTPException(status_code=500, detail=f"Rollback failed: {str(e)}")
+    else:
+        reverted_files.append("No file changes to revert (shell command restart).")
+
+    db.update_incident_status(incident_id, "rolled_back", action_output="\n".join(reverted_files))
+    return {"status": "rolled_back", "details": reverted_files}
 
 @app.get("/api/stripe/subscription")
 def get_stripe_subscription(session_id: str):

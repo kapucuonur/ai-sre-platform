@@ -147,8 +147,13 @@ def test_stripe_checkout_simulated():
     assert response.status_code == 200
     data = response.json()
     assert "url" in data
-    assert data["simulated"] is True
-    assert "payment-success" in data["url"]
+    # If using mock, simulated is True, otherwise False
+    is_mock = os.getenv("STRIPE_SECRET_KEY", "sk_test_mock") == "sk_test_mock"
+    assert data["simulated"] is is_mock
+    if is_mock:
+        assert "payment-success" in data["url"]
+    else:
+        assert "checkout.stripe.com" in data["url"]
 
 def test_stripe_webhook_simulated_success():
     # Simulate a Stripe webhook call for checkout completion
@@ -280,5 +285,51 @@ def test_stripe_webhook_cryptographic_signature_invalid():
         
     finally:
         main.STRIPE_WEBHOOK_SECRET = original_secret
+
+
+def test_rollback_incident_non_existent():
+    response = client.post("/api/incidents/9999/rollback")
+    assert response.status_code == 404
+    assert "Incident not found" in response.json()["detail"]
+
+
+def test_rollback_incident_wrong_state():
+    # Create incident in pending state
+    inc_id = db.create_incident(
+        title="Pending Incident",
+        service="test-service",
+        alert_payload={},
+        logs="",
+        ai_analysis="",
+        proposed_command="echo"
+    )
+    # Attempt rollback
+    response = client.post(f"/api/incidents/{inc_id}/rollback")
+    assert response.status_code == 400
+    assert "Only resolved or failed incidents" in response.json()["detail"]
+
+
+def test_rollback_incident_success_no_file():
+    # Create resolved incident with shell command (no file target)
+    inc_id = db.create_incident(
+        title="Resolved Command Incident",
+        service="test-service",
+        alert_payload={},
+        logs="",
+        ai_analysis="",
+        proposed_command="docker compose restart"
+    )
+    db.update_incident_status(inc_id, "resolved")
+    
+    response = client.post(f"/api/incidents/{inc_id}/rollback")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "rolled_back"
+    assert "No file changes to revert" in data["details"][0]
+    
+    # Verify DB status updated
+    inc = db.get_incident(inc_id)
+    assert inc["status"] == "rolled_back"
+
 
 

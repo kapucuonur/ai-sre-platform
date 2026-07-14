@@ -53,8 +53,29 @@ function History() {
       case 'approved': return 'badge badge-approved'
       case 'rejected': return 'badge badge-rejected'
       case 'pending': return 'badge badge-pending'
+      case 'rolled_back': return 'badge badge-rejected'
       default: return 'badge'
     }
+  }
+
+  const handleRollback = (id) => {
+    if (!window.confirm('Are you sure you want to rollback this fix? This will attempt to revert code changes applied to files.')) return
+    
+    fetch(`${API_BASE}/api/incidents/${id}/rollback`, {
+      method: 'POST'
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Rollback failed')
+        return res.json()
+      })
+      .then((data) => {
+        alert('Rollback completed: ' + (data.details ? data.details.join(', ') : 'Success'))
+        fetchHistory()
+      })
+      .catch((err) => {
+        console.error('Error during rollback:', err)
+        alert('Failed to execute rollback: ' + err.message)
+      })
   }
 
   return (
@@ -89,6 +110,7 @@ function History() {
                   <th><span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Terminal size={14} /> Applied Command</span></th>
                   <th>Status</th>
                   <th><span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Clock size={14} /> Duration</span></th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -113,6 +135,19 @@ function History() {
                     </td>
                     <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                       {getDuration(row)}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {(row.status === 'resolved' || row.status === 'failed') && row.proposed_command && row.proposed_command.startsWith('[') ? (
+                        <button 
+                          className="btn btn-secondary" 
+                          onClick={() => handleRollback(row.id)}
+                          style={{ padding: '4px 8px', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444' }}
+                        >
+                          Rollback
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
+                      )}
                     </td>
                   </tr>
                 ))}
