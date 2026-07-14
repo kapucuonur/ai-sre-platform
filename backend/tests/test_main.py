@@ -332,4 +332,58 @@ def test_rollback_incident_success_no_file():
     assert inc["status"] == "rolled_back"
 
 
+def test_serve_install_script():
+    response = client.get("/install.sh")
+    assert response.status_code == 200
+    assert "🚀 Starting SRE Daemon installation..." in response.text
+    assert "SRE_API_KEY" in response.text
+
+
+def test_get_system_status_offline_default():
+    response = client.get("/api/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "offline"
+
+
+def test_get_system_status_online():
+    # Save status
+    db.save_tenant_status(
+        api_key="self-hosted",
+        cpu_temp="45.2°C",
+        memory="2.4Gi / 16.0Gi",
+        disk="50G / 250G",
+        containers_json='[{"name": "bikefit-api", "status": "active"}]'
+    )
+    response = client.get("/api/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "online"
+    assert data["cpu_temp"] == "45.2°C"
+
+
+def test_get_system_status_offline_stale():
+    # Save status
+    db.save_tenant_status(
+        api_key="self-hosted",
+        cpu_temp="45.2°C",
+        memory="2.4Gi / 16.0Gi",
+        disk="50G / 250G",
+        containers_json='[{"name": "bikefit-api", "status": "active"}]'
+    )
+    
+    # Manually update SQLite timestamp to 10 minutes ago
+    from datetime import datetime, timezone, timedelta
+    stale_time = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+    with db.get_db() as conn:
+        conn.execute("UPDATE tenant_status SET updated_at = ? WHERE api_key = ?", (stale_time, "self-hosted"))
+        conn.commit()
+        
+    response = client.get("/api/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "offline"
+
+
+
 

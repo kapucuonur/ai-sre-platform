@@ -352,12 +352,23 @@ async def get_system_status(x_sre_api_key: Optional[str] = Header(None, alias="X
     # Try to fetch last reported status for this tenant from database
     tenant_data = db.get_tenant_status(api_key_to_use)
     if tenant_data:
+        from datetime import datetime, timezone
+        updated_at = tenant_data.get("updated_at")
+        is_online = False
+        if updated_at:
+            try:
+                diff = datetime.now(timezone.utc) - datetime.fromisoformat(updated_at)
+                is_online = diff.total_seconds() < 300 # 5 minutes
+            except Exception:
+                pass
+                
         try:
             raw_containers = json.loads(tenant_data.get("containers", "[]"))
             filtered_containers = [
                 c for c in raw_containers if c.get("name") in ALLOWED_CONTAINERS
             ]
             return {
+                "status": "online" if is_online else "offline",
                 "cpu_temp": tenant_data.get("cpu_temp", "N/A"),
                 "memory": tenant_data.get("memory", "N/A"),
                 "disk": tenant_data.get("disk", "N/A"),
@@ -367,45 +378,97 @@ async def get_system_status(x_sre_api_key: Optional[str] = Header(None, alias="X
             pass
 
     stats = {
-        "cpu_temp": "42.8°C",
-        "memory": "2.4Gi / 16.0Gi",
-        "disk": "58G / 250G (23% used)",
+        "status": "offline",
+        "cpu_temp": "N/A",
+        "memory": "N/A",
+        "disk": "N/A",
         "containers": []
     }
-    
-    # Whitelist of containers to show in the public dashboard (excludes private containers)
-    ALLOWED_CONTAINERS = {
-        "ai-sre-platform",
-        "bikefit-api",
-        "bikefit-frontend",
-        "coachonurai-api",
-        "trihonor-api-prod",
-        "trihonor-db-prod",
-        "sre-daemon"
-    }
-
-    try:
-        # Active containers - query system docker but filter strictly by whitelist
-        docker_res = subprocess.run(
-            ["docker", "ps", "--format", "{{.Names}}|{{.Status}}"],
-            capture_output=True, text=True, timeout=5
-        )
-        containers = docker_res.stdout.strip().splitlines()
-        for c in containers:
-            parts = c.split("|")
-            name = parts[0]
-            if name in ALLOWED_CONTAINERS:
-                stats["containers"].append({
-                    "name": name,
-                    "status": parts[1]
-                })
-        
-        # Sort containers by name for consistent UI rendering
-        stats["containers"].sort(key=lambda x: x["name"])
-    except Exception:
-        pass
-        
     return stats
+
+@app.get("/install.sh")
+def serve_install_script():
+    """
+    Serves the autonomous SRE Daemon installation script.
+    """
+    from fastapi.responses import Response
+    script = """#!/bin/bash
+set -e
+
+# SRE Daemon Installer
+# TriHonor Oy · Tampere, Finland
+
+echo "🚀 Starting SRE Daemon installation..."
+
+if [ -z "$SRE_API_KEY" ]; then
+    echo "❌ Error: SRE_API_KEY environment variable is required."
+    exit 1
+fi
+
+PLATFORM_URL=${SRE_PLATFORM_URL:-"https://sre-api.trihonor.com"}
+INSTALL_DIR="/home/pi/sre"
+
+# Fallback to /opt if not on pi
+if [ ! -d "/home/pi" ]; then
+    INSTALL_DIR="/opt/sre-daemon"
+fi
+
+echo "📂 Installation directory: $INSTALL_DIR"
+sudo mkdir -p "$INSTALL_DIR"
+sudo chown -R $USER:$USER "$INSTALL_DIR"
+
+echo "📦 Installing system dependencies..."
+if command -v apt-get &> /dev/null; then
+    sudo apt-get update -y -q
+    sudo apt-get install -y python3 python3-requests python3-yaml curl git sshpass
+elif command -v yum &> /dev/null; then
+    sudo yum install -y python3 python3-requests python3-pip curl git
+    pip3 install pyyaml requests
+else
+    echo "⚠️ Unknown OS package manager. Please ensure Python3, requests, and pyyaml are installed."
+fi
+
+echo "📥 Downloading latest SRE Daemon release..."
+curl -sSL "https://raw.githubusercontent.com/kapucuonur/sre-daemon/main/sre_daemon.py" -o "$INSTALL_DIR/sre_daemon.py"
+chmod +x "$INSTALL_DIR/sre_daemon.py"
+
+echo "⚙️ Configuring environment..."
+cat << EOF > "$INSTALL_DIR/.env"
+# SRE Daemon Configuration
+SRE_API_KEY=$SRE_API_KEY
+SRE_PLATFORM_URL=$PLATFORM_URL
+PI_OLLAMA_URL=http://localhost:11434
+HEAL_LOG=$INSTALL_DIR/heal_log.jsonl
+EOF
+
+echo "🖥️ Registering systemd service..."
+cat << EOF | sudo tee /etc/systemd/system/sre-daemon.service > /dev/null
+[Unit]
+Description=TriHonor SRE Daemon - Autonomous Self-Healing Platform Client
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$INSTALL_DIR
+ExecStart=/usr/bin/python3 $INSTALL_DIR/sre_daemon.py
+Restart=always
+RestartSec=5
+EnvironmentFile=$INSTALL_DIR/.env
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "🔄 Reloading systemd and starting service..."
+sudo systemctl daemon-reload
+sudo systemctl enable sre-daemon.service
+sudo systemctl restart sre-daemon.service
+
+echo "✅ SRE Daemon successfully installed and running!"
+sudo systemctl status sre-daemon.service --no-pager | grep -E "Active:"
+"""
+    return Response(content=script, media_type="text/plain")
 
 @app.get("/api/incidents")
 async def list_incidents():
