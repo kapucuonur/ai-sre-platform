@@ -809,6 +809,258 @@ async def rollback_incident(incident_id: int):
     db.update_incident_status(incident_id, "rolled_back", action_output="\n".join(reverted_files))
     return {"status": "rolled_back", "details": reverted_files}
 
+@app.get("/api/incidents/{incident_id}/report")
+def generate_incident_report(incident_id: int):
+    """
+    Generates a beautifully formatted HTML incident post-mortem report.
+    """
+    incident = db.get_incident(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    from fastapi.responses import HTMLResponse
+    
+    status_emoji = {
+        "resolved": "✅ Resolved",
+        "failed": "❌ Failed",
+        "rolled_back": "🔄 Rolled Back",
+        "pending": "⏳ Pending Approval",
+        "approved": "⚙️ Approved",
+        "rejected": "🚫 Rejected"
+    }.get(incident["status"], incident["status"])
+
+    duration_str = f"{incident['duration']:.2f}s" if incident.get("duration") else "N/A"
+    
+    # Try parsing proposed_command as JSON to format file changes
+    proposed_content = ""
+    cmd = incident["proposed_command"]
+    if cmd and cmd.strip().startswith("["):
+        try:
+            actions = json.loads(cmd)
+            for act in actions:
+                act_type = act.get("type", "unknown")
+                target = act.get("target", "unknown")
+                payload = act.get("payload", "")
+                search = act.get("search", "")
+                replace = act.get("replace", "")
+                
+                proposed_content += f"<div class='action-card'><strong>Type:</strong> {act_type}<br><strong>Target File:</strong> <code>{target}</code>"
+                if search or replace:
+                    proposed_content += f"<pre><code>- {search}\\n+ {replace}</code></pre>"
+                elif payload:
+                    proposed_content += f"<pre><code>{payload}</code></pre>"
+                proposed_content += "</div>"
+        except Exception:
+            proposed_content = f"<pre><code>{cmd}</code></pre>"
+    else:
+        proposed_content = f"<pre><code>{cmd or 'None'}</code></pre>"
+
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>SRE Post-Mortem Report - Incident #{incident_id}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap');
+        body {{
+            font-family: 'Inter', sans-serif;
+            background-color: #060a0f;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 40px;
+            line-height: 1.6;
+        }}
+        .container {{
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #0b131c;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }}
+        .header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 24px;
+            margin-bottom: 32px;
+        }}
+        .logo {{
+            font-size: 20px;
+            font-weight: 700;
+            color: #f8fafc;
+        }}
+        .logo span {{
+            color: #22d3ee;
+        }}
+        .report-title {{
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+            color: #f8fafc;
+        }}
+        .status-badge {{
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            background-color: rgba(34, 211, 238, 0.1);
+            color: #22d3ee;
+            border: 1px solid rgba(34, 211, 238, 0.2);
+        }}
+        .status-resolved {{
+            background-color: rgba(74, 222, 128, 0.1);
+            color: #4ade80;
+            border-color: rgba(74, 222, 128, 0.2);
+        }}
+        .status-failed, .status-rolled_back {{
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.2);
+        }}
+        .grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 32px;
+        }}
+        .meta-item {{
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 8px;
+            padding: 16px;
+        }}
+        .meta-label {{
+            font-size: 11px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }}
+        .meta-value {{
+            font-size: 15px;
+            font-weight: 600;
+            color: #f1f5f9;
+        }}
+        h3 {{
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-top: 32px;
+            margin-bottom: 12px;
+            border-left: 3px solid #22d3ee;
+            padding-left: 12px;
+        }}
+        pre {{
+            background-color: #04070a;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: #38bdf8;
+            margin: 0;
+        }}
+        .action-card {{
+            background-color: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }}
+        .footer {{
+            margin-top: 48px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #475569;
+        }}
+        @media print {{
+            body {{
+                background-color: #fff;
+                color: #000;
+                padding: 0;
+            }}
+            .container {{
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                background-color: #fff;
+            }}
+            .meta-item {{
+                background-color: #f8fafc;
+                border: 1px solid #e2e8f0;
+            }}
+            pre, .action-card {{
+                background-color: #f8fafc;
+                border: 1px solid #e2e8f0;
+                color: #000;
+            }}
+            .report-title, h3, .logo {{
+                color: #000 !important;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <div class="logo">SRE<span>daemon</span></div>
+                <h1 class="report-title">Incident Post-Mortem Report</h1>
+            </div>
+            <div class="status-badge status-{incident['status']}">
+                {status_emoji}
+            </div>
+        </div>
+        
+        <div class="grid">
+            <div class="meta-item">
+                <div class="meta-label">Incident ID</div>
+                <div class="meta-value">#{incident_id}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Service Name</div>
+                <div class="meta-value" style="text-transform: uppercase;">{incident['service']}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Incident Time</div>
+                <div class="meta-value">{incident['created_at'].replace('T', ' ')[:19]}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Recovery Duration</div>
+                <div class="meta-value">{duration_str}</div>
+            </div>
+        </div>
+        
+        <h3>Incident Title / Cause</h3>
+        <p style="margin: 0; font-weight: 500;">{incident['title']}</p>
+        
+        <h3>Raw Logs & Context</h3>
+        <pre style="color: #f87171; max-height: 250px;">{incident['logs']}</pre>
+        
+        <h3>AI Root Cause Analysis</h3>
+        <p style="margin: 0;">{incident['ai_analysis']}</p>
+        
+        <h3>Proposed Remediation Actions</h3>
+        {proposed_content}
+        
+        <h3>Execution Output & Results</h3>
+        <pre style="max-height: 250px;">{incident['action_output'] or 'No action output logged.'}</pre>
+        
+        <div class="footer">
+            Report generated autonomously by TriHonor SRE Daemon Platform · Tampere, Finland
+        </div>
+    </div>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
+
 @app.get("/api/stripe/subscription")
 def get_stripe_subscription(session_id: str):
     if session_id.startswith("cs_test_"):

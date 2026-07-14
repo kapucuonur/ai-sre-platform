@@ -136,8 +136,15 @@ function History() {
                     <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                       {getDuration(row)}
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {(row.status === 'resolved' || row.status === 'failed') && row.proposed_command && row.proposed_command.startsWith('[') ? (
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button 
+                        className="btn btn-secondary" 
+                        onClick={() => window.open(`${API_BASE}/api/incidents/${row.id}/report`, '_blank')}
+                        style={{ padding: '4px 8px', fontSize: '0.75rem', marginRight: '8px' }}
+                      >
+                        Report
+                      </button>
+                      {(row.status === 'resolved' || row.status === 'failed') && row.proposed_command && row.proposed_command.startsWith('[') && (
                         <button 
                           className="btn btn-secondary" 
                           onClick={() => handleRollback(row.id)}
@@ -145,8 +152,6 @@ function History() {
                         >
                           Rollback
                         </button>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
                       )}
                     </td>
                   </tr>

@@ -385,5 +385,32 @@ def test_get_system_status_offline_stale():
     assert data["status"] == "offline"
 
 
+def test_generate_incident_report_non_existent():
+    response = client.get("/api/incidents/9999/report")
+    assert response.status_code == 404
+    assert "Incident not found" in response.json()["detail"]
+
+
+def test_generate_incident_report_success():
+    inc_id = db.create_incident(
+        title="OOM Failure In API Service",
+        service="api-service",
+        alert_payload={},
+        logs="out of memory error log content",
+        ai_analysis="caused by leak in cache",
+        proposed_command="[{\"type\": \"replace\", \"target\": \"main.py\", \"search\": \"old\", \"replace\": \"new\"}]"
+    )
+    db.update_incident_status(inc_id, "resolved")
+    
+    response = client.get(f"/api/incidents/{inc_id}/report")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Incident Post-Mortem Report" in response.text
+    assert "OOM Failure In API Service" in response.text
+    assert "api-service" in response.text
+    assert "Target File" in response.text
+
+
+
 
 
