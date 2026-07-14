@@ -17,6 +17,10 @@ This platform connects to your existing alert channels (like Grafana Webhooks), 
 
 ## Key Features (New!)
 
+* **LLM Jury Consensus**: Multi-model consensus voting layer where high-risk commands are validated by Gemini and Groq (Llama 3) in parallel, escalating to Claude (Sonnet) for final arbitration in case of disagreement.
+* **Predictive Container Auto-Scaling**: Proactively scales Docker Compose replicas (`--scale <service>=<n+1>`) on CPU/RAM saturation before a crash occurs, falling back to safe service restarts.
+* **Teams & Slack ChatOps**: Full ChatOps integration with interactive approve/reject/rollback cards (Slack Block Kit & Microsoft Teams Adaptive Cards).
+* **Alert Fatigue Dashboard**: Dynamically computes incident occurrences by signature, grouping alert frequency to track and analyze alert fatigue.
 * **Stripe Billing Integration**: Full Stripe checkout subscription flow for Pro (€49/mo) and Scale (€149/mo) plans, with secure webhook signature validation and automated client API key generation.
 * **Onboarding Email Delivery**: Automated onboarding email templates sent via Zoner.fi SMTP to new subscribers containing their SRE installation keys.
 * **Incident Rollback System**: Revert LLM-remedied file changes dynamically from the frontend history page via git checkout integration.
