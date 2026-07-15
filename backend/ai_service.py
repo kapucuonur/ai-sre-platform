@@ -96,7 +96,7 @@ def query_ollama(prompt: str) -> str:
         resp = requests.post(
             f"{ollama_url}/api/generate",
             json={
-                "model": "qwen2.5-coder:7b",
+                "model": "qwen2.5-coder:1.5b",
                 "prompt": prompt,
                 "stream": False,
                 "options": {"temperature": 0.1, "num_predict": 800}
@@ -108,6 +108,7 @@ def query_ollama(prompt: str) -> str:
     except Exception as e:
         logger.warning("Ollama call failed: %s", e)
         return None
+
 
 def query_claude(prompt: str) -> str:
     """Helper to query Anthropic Claude API."""
