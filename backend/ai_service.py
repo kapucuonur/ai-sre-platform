@@ -178,6 +178,31 @@ def query_groq(prompt: str) -> str:
         logger.error("Groq API call failed: %s", e)
         return None
 
+def query_xai(prompt: str) -> str:
+    """Helper to query xAI Grok API."""
+    xai_key = db.get_setting("XAI_API_KEY")
+    if not xai_key:
+        logger.warning("xAI API key not set in database.")
+        return None
+    try:
+        url = "https://api.x.ai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {xai_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "grok-3-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2
+        }
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        logger.error("xAI API call failed: %s", e)
+        return None
+
+
 def increment_cost(provider: str):
     """Tracks and accumulates monetary API expenditure."""
     cost_map = {
@@ -305,6 +330,8 @@ Output ONLY a JSON response in the following schema:
     gemini_key = db.get_setting("GEMINI_API_KEY")
     claude_key = db.get_setting("CLAUDE_API_KEY") or db.get_setting("ANTHROPIC_API_KEY")
     groq_key = db.get_setting("GROQ_API_KEY")
+    xai_key = db.get_setting("XAI_API_KEY")
+
 
     prompt_router = f"""You are the Chief SRE Router.
 Classify the following alert into one of these categories:
@@ -558,7 +585,16 @@ Output ONLY a JSON response in the following schema:
                     increment_daily_calls("claude")
                     increment_cost("claude")
 
+
+    # Try xAI Grok if previous cloud options failed
+    if not result_text and xai_key:
+        logger.info("Previous cloud options failed. Trying xAI Grok fallback...")
+        result_text = query_xai(prompt_cloud)
+        if result_text:
+            source = "xai-fallback"
+
     # Local Ollama fallback if all cloud options failed
+
     if not result_text and ollama_enabled:
         logger.info("All cloud options failed. Falling back to local Ollama...")
         result_text = query_ollama(prompt_cloud)

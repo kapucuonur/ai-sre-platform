@@ -36,7 +36,9 @@ class SettingsModel(BaseModel):
     slack_channel_id: Optional[str] = None
     slack_signing_secret: Optional[str] = None
     anthropic_api_key: Optional[str] = None
+    xai_api_key: Optional[str] = None
     autonomous_mode: Optional[bool] = None
+
 
 class TelegramLogModel(BaseModel):
     chat_id: str
@@ -668,6 +670,7 @@ async def get_settings():
         "slack_channel_id": settings.get("SLACK_CHANNEL_ID", ""),
         "slack_signing_secret": mask_key(settings.get("SLACK_SIGNING_SECRET", "")),
         "anthropic_api_key": mask_key(settings.get("ANTHROPIC_API_KEY", "")),
+        "xai_api_key": mask_key(settings.get("XAI_API_KEY", "")),
         "autonomous_mode": settings.get("autonomous_mode", "false") == "true"
     }
 
@@ -689,6 +692,9 @@ async def save_settings(payload: SettingsModel):
 
     if payload.anthropic_api_key and not payload.anthropic_api_key.startswith("..."):
         db.set_setting("ANTHROPIC_API_KEY", payload.anthropic_api_key)
+
+    if payload.xai_api_key and not payload.xai_api_key.startswith("..."):
+        db.set_setting("XAI_API_KEY", payload.xai_api_key)
 
     if payload.autonomous_mode is not None:
         db.set_setting("autonomous_mode", "true" if payload.autonomous_mode else "false")

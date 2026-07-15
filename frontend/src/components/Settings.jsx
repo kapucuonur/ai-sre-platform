@@ -6,6 +6,7 @@ function Settings() {
   const [form, setForm] = useState({
     gemini_api_key: '',
     anthropic_api_key: '',
+    xai_api_key: '',
     slack_bot_token: '',
     slack_channel_id: '',
     slack_signing_secret: '',
@@ -16,6 +17,7 @@ function Settings() {
   const [showKeys, setShowKeys] = useState({
     gemini: false,
     anthropic: false,
+    xai: false,
     slack: false,
     slackSecret: false
   })
@@ -27,6 +29,7 @@ function Settings() {
         setForm({
           gemini_api_key: data.gemini_api_key || '',
           anthropic_api_key: data.anthropic_api_key || '',
+          xai_api_key: data.xai_api_key || '',
           slack_bot_token: data.slack_bot_token || '',
           slack_channel_id: data.slack_channel_id || '',
           slack_signing_secret: data.slack_signing_secret || '',
@@ -34,6 +37,7 @@ function Settings() {
         })
         setLoading(false)
       })
+
       .catch((err) => {
         console.error('Error fetching settings:', err)
         setLoading(false)
@@ -132,6 +136,15 @@ function Settings() {
           placeholder="sk-ant-..."
           hint="Secondary cascade model. Leave empty to disable Claude entirely."
         />
+
+        <PasswordField
+          label="xAI Grok API Key"
+          icon={<Zap size={16} color="#10b981" />}
+          fieldKey="xai_api_key" showKey="xai"
+          placeholder="xai-..."
+          hint="Third cloud cascade fallback model. Calls grok-3-mini."
+        />
+
 
         {/* Slack Integration */}
         <p style={{ fontWeight: 600, color: 'var(--accent-cyan)', marginTop: '1.5rem', marginBottom: '1rem', fontSize: '0.85rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
