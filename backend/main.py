@@ -34,7 +34,16 @@ class SettingsModel(BaseModel):
     gemini_api_key: Optional[str] = None
     slack_bot_token: Optional[str] = None
     slack_channel_id: Optional[str] = None
+    slack_signing_secret: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
     autonomous_mode: Optional[bool] = None
+
+class TelegramLogModel(BaseModel):
+    chat_id: str
+    direction: str      # 'in' | 'out'
+    text: str
+    username: Optional[str] = None
+    command: Optional[str] = None
 
 class ManualActionModel(BaseModel):
     action: str  # approve or reject
@@ -539,6 +548,109 @@ async def trigger_manual_action(incident_id: int, payload: ManualActionModel, ba
         
     raise HTTPException(status_code=400, detail="Invalid action")
 
+# ── Ajan-C: Telegram Message History ─────────────────────────────────────────
+
+@app.get("/api/telegram/history")
+async def get_telegram_history(limit: int = 100):
+    """Returns the most recent Telegram messages logged by the daemon."""
+    messages = db.get_telegram_messages(limit=min(limit, 500))
+    return {"messages": messages, "total": len(messages)}
+
+@app.post("/api/telegram/log")
+async def log_telegram_message_endpoint(
+    payload: TelegramLogModel,
+    x_sre_api_key: Optional[str] = Header(None, alias="X-SRE-API-Key")
+):
+    """
+    Receives Telegram message log entries from the SRE Daemon.
+    Called internally by the daemon poller to persist message history.
+    """
+    db.log_telegram_message(
+        chat_id=payload.chat_id,
+        direction=payload.direction,
+        text=payload.text,
+        username=payload.username,
+        command=payload.command
+    )
+    return {"status": "logged"}
+
+# ── Ajan-D: Slack HITL Slash Commands / Interactive Actions ──────────────────
+
+@app.post("/slack/actions")
+async def slack_interactive_actions(request: Request, background_tasks: BackgroundTasks):
+    """
+    Slack Interactivity endpoint.
+    Receives button callback payloads (approve / reject) from Slack Block Kit.
+    Must be configured as the Interactivity Request URL in the Slack App settings.
+    """
+    import urllib.parse, hmac, hashlib, time as _time
+
+    body_bytes = await request.body()
+
+    # ── Slack signature verification ──────────────────────────────────────────
+    slack_signing_secret = db.get_setting("SLACK_SIGNING_SECRET", "")
+    if slack_signing_secret:
+        ts = request.headers.get("X-Slack-Request-Timestamp", "")
+        sig = request.headers.get("X-Slack-Signature", "")
+        if not ts or not sig:
+            raise HTTPException(status_code=403, detail="Missing Slack signature headers")
+        # Replay attack guard: reject requests older than 5 minutes
+        if abs(_time.time() - int(ts)) > 300:
+            raise HTTPException(status_code=403, detail="Slack request timestamp too old")
+        base = f"v0:{ts}:{body_bytes.decode()}"
+        expected = "v0=" + hmac.new(
+            slack_signing_secret.encode(), base.encode(), hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected, sig):
+            raise HTTPException(status_code=403, detail="Invalid Slack signature")
+
+    # ── Parse payload ─────────────────────────────────────────────────────────
+    form_data = urllib.parse.parse_qs(body_bytes.decode())
+    raw_payload = form_data.get("payload", [None])[0]
+    if not raw_payload:
+        raise HTTPException(status_code=400, detail="Missing payload")
+
+    import json as _json
+    try:
+        slack_payload = _json.loads(raw_payload)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    actions = slack_payload.get("actions", [])
+    if not actions:
+        return {"ok": True}
+
+    action = actions[0]
+    action_id = action.get("action_id")  # approve_action | reject_action
+    value = action.get("value", "")      # approve_<incident_id> | reject_<incident_id>
+
+    try:
+        parts = value.split("_", 1)
+        op = parts[0]          # approve | reject
+        incident_id = int(parts[1])
+    except (IndexError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid action value format")
+
+    incident = db.get_incident(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    user = slack_payload.get("user", {}).get("username", "slack-user")
+
+    if op == "approve":
+        if incident["status"] != "pending":
+            return {"ok": True, "note": "Incident already processed"}
+        background_tasks.add_task(run_approved_incident_action, incident_id, None, [], f"Slack:{user}")
+        logger.info("[SLACK-HITL] Incident %d approved by Slack user: %s", incident_id, user)
+        return {"ok": True, "status": "approving"}
+
+    elif op == "reject":
+        db.update_incident_status(incident_id, "rejected")
+        logger.info("[SLACK-HITL] Incident %d rejected by Slack user: %s", incident_id, user)
+        return {"ok": True, "status": "rejected"}
+
+    raise HTTPException(status_code=400, detail="Unknown operation")
+
 @app.get("/api/settings")
 async def get_settings():
     settings = db.get_all_settings()
@@ -554,6 +666,8 @@ async def get_settings():
         "gemini_api_key": mask_key(settings.get("GEMINI_API_KEY", "")),
         "slack_bot_token": mask_key(settings.get("SLACK_BOT_TOKEN", "")),
         "slack_channel_id": settings.get("SLACK_CHANNEL_ID", ""),
+        "slack_signing_secret": mask_key(settings.get("SLACK_SIGNING_SECRET", "")),
+        "anthropic_api_key": mask_key(settings.get("ANTHROPIC_API_KEY", "")),
         "autonomous_mode": settings.get("autonomous_mode", "false") == "true"
     }
 
@@ -569,6 +683,12 @@ async def save_settings(payload: SettingsModel):
         
     if payload.slack_channel_id is not None:
         db.set_setting("SLACK_CHANNEL_ID", payload.slack_channel_id)
+
+    if payload.slack_signing_secret and not payload.slack_signing_secret.startswith("..."):
+        db.set_setting("SLACK_SIGNING_SECRET", payload.slack_signing_secret)
+
+    if payload.anthropic_api_key and not payload.anthropic_api_key.startswith("..."):
+        db.set_setting("ANTHROPIC_API_KEY", payload.anthropic_api_key)
 
     if payload.autonomous_mode is not None:
         db.set_setting("autonomous_mode", "true" if payload.autonomous_mode else "false")

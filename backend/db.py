@@ -87,6 +87,20 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tenant_metrics_ts ON tenant_metrics (timestamp)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tenant_metrics_key ON tenant_metrics (api_key)")
         
+        # Telegram message log table (inbound + outbound)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS telegram_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id TEXT NOT NULL,
+                direction TEXT NOT NULL,  -- 'in' | 'out'
+                text TEXT NOT NULL,
+                username TEXT,
+                command TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tg_msg_ts ON telegram_messages (created_at)")
+        
         conn.commit()
 
 def get_setting(key: str, default: str = "") -> str:
@@ -357,6 +371,33 @@ def get_tenant_metrics_history(api_key: str, entity: str = "host", limit: int = 
             )
             rows = cur.fetchall()
             return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+def log_telegram_message(chat_id: str, direction: str, text: str, username: str = None, command: str = None):
+    """Log inbound ('in') or outbound ('out') Telegram messages to DB."""
+    try:
+        with get_db() as conn:
+            conn.execute(
+                """INSERT INTO telegram_messages (chat_id, direction, text, username, command, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (str(chat_id), direction, text[:2000], username, command, datetime.utcnow().isoformat())
+            )
+            conn.commit()
+    except Exception as e:
+        print(f"Error logging telegram message: {e}")
+
+def get_telegram_messages(limit: int = 100) -> list:
+    """Return the most recent Telegram messages (newest first)."""
+    try:
+        with get_db() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """SELECT id, chat_id, direction, text, username, command, created_at
+                   FROM telegram_messages ORDER BY created_at DESC LIMIT ?""",
+                (limit,)
+            )
+            return [dict(r) for r in cur.fetchall()]
     except Exception:
         return []
 
