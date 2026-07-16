@@ -168,3 +168,6 @@ backend/data/
 *.db
 *.db-journal
 *.sqlite
+
+# IDE Customizations
+.agents/
